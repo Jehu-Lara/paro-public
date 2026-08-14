@@ -45,3 +45,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   PostgreSQL's, which does and was already anchored correctly) - added a
   required `table_name` parameter and qualified each column check with it
   (`f"{table_name}.{name}"`).
+
+### Changed
+
+- `db/session.py`'s engine and `sessionmaker` were built as a module-level
+  side effect (`engine: Engine = _make_engine()` at import time), coupling
+  merely importing the module to `get_settings()` already being resolved
+  and complicating anything that needs to swap the connection string.
+  Replaced with `get_engine()`/`get_session_local()`, both cached
+  (`lru_cache`, same pattern already used by `get_settings()` itself) so
+  construction is deferred to first call instead of import, with identical
+  singleton behavior otherwise. `api/deps.py::get_db` and
+  `scripts/seed_demo.py::main` updated accordingly; `alembic/env.py` builds
+  its own engine independently and needed no change. No test previously
+  exercised the real `get_db()` (the `client` fixture always overrides it,
+  and `test_seed_demo.py` never calls `main()`) - new
+  `tests/integration/test_db_session.py` covers the real wiring end to end,
+  plus that import alone no longer builds an engine and that the SQLite
+  foreign-key PRAGMA still gets registered correctly. `conftest.py`'s
+  docstring explaining why `get_settings.cache_clear()` is needed before
+  running Alembic in tests referenced the old eager-import behavior; updated
+  to describe the new lazy one.

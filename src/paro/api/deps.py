@@ -6,7 +6,7 @@ from collections.abc import Generator
 
 from sqlalchemy.orm import Session
 
-from paro.db.session import SessionLocal
+from paro.db.session import get_session_local
 
 __all__ = ["get_db"]
 
@@ -20,7 +20,7 @@ def get_db() -> Generator[Session]:
     sin comitear ni hacer rollback manual; ``close()`` descarta el estado
     pendiente de forma segura.
     """
-    db = SessionLocal()
+    db = get_session_local()()
     try:
         yield db
     finally:

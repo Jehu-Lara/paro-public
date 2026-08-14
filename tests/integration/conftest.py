@@ -57,9 +57,10 @@ def _alembic_config() -> Config:
 def _database_url_applied(monkeypatch: pytest.MonkeyPatch, database_url: str) -> Iterator[None]:
     """Apunta ``PARO_DATABASE_URL`` a ``database_url`` mientras corre Alembic.
 
-    ``get_settings`` es ``lru_cache(maxsize=1)`` y ya quedo poblado al importar
-    este modulo: ``paro.main`` arrastra ``paro.db.session``, que construye su
-    engine en tiempo de import. Sin ``cache_clear()`` **antes**, ``alembic``
+    ``get_settings`` es ``lru_cache(maxsize=1)`` y puede quedar poblado por
+    cualquier import previo a este punto (``paro.db.session.get_engine()``
+    lo resuelve la primera vez que se llama, no al importar el modulo -- ver
+    ``CHANGELOG.md``). Sin ``cache_clear()`` **antes**, ``alembic``
     leeria ese valor cacheado y migraria la base por defecto (``./paro.db``)
     ignorando esta URL -- en la rama de PostgreSQL eso seria un job en verde que
     en realidad nunca toco PostgreSQL. Sin ``cache_clear()`` **despues**, el

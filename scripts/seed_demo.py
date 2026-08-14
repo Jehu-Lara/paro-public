@@ -28,7 +28,7 @@ from paro.db.models import (
     Shift,
 )
 from paro.db.repositories import create_downtime_event, create_production_record
-from paro.db.session import SessionLocal
+from paro.db.session import get_session_local
 
 __all__ = ["main", "run"]
 
@@ -236,7 +236,7 @@ def _print_summary(counts: dict[str, int]) -> None:
 
 
 def main() -> None:
-    with SessionLocal() as session:
+    with get_session_local()() as session:
         counts = run(session)
     _print_summary(counts)
 
