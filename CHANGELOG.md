@@ -29,3 +29,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   exposes `require_aware` (was private); the router delegates to it and
   converts `ValueError` into `HTTPException(422)`, instead of reimplementing
   a looser version of the same check.
+- `README.md` no longer implies a Docker-based local setup that doesn't
+  exist: there's no `Dockerfile` or `docker-compose.yml` in this repo, and
+  PostgreSQL is only validated in CI (a `postgres:16` GitHub Actions service
+  container, see ADR 0003) - local development runs on SQLite. Removed the
+  "Docker Desktop" bullet from Requirements and "Docker" from the Sprint 4
+  roadmap line, both of which overstated what's actually provided.

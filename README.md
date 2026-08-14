@@ -71,9 +71,6 @@ Deliberate decisions, documented in `docs/adr/`. Listed here so the project
 
 - Python **3.14** (uses the system interpreter; see `docs/adr/0001-python-314.md`)
 - [uv](https://docs.astral.sh/uv/)
-- Docker Desktop only if you want to run locally against PostgreSQL instead of
-  SQLite (optional; CI already validates PostgreSQL via a service container -
-  see [ADR 0003](docs/adr/0003-ci-postgres-service-sin-docker-local.md))
 
 ## Quick start
 
@@ -124,7 +121,7 @@ open events) is documented in `docs/oee-definition.md`.
 1. Sprint 1 - interval and OEE engine with tests.
 2. Sprint 2 - persistence, migrations, and idempotency.
 3. Sprint 3 - full API and integration tests.
-4. Sprint 4 - analytics layer, Docker, CI, and documentation.
+4. Sprint 4 - analytics layer, CI, and documentation.
 
 ---
 
