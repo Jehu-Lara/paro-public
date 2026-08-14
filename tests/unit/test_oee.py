@@ -38,7 +38,7 @@ def test_happy_path_without_downtime() -> None:
         unplanned_downtimes=[],
         total_count=480,
         good_count=456,
-        ideal_cycle_time_seconds=Decimal(30),
+        ideal_time_total_seconds=Decimal(14400),  # 30s x 480
     )
 
     assert result.planned_production_time_seconds == 28800
@@ -68,7 +68,7 @@ def test_planned_downtime_is_removed_from_planned_production_time() -> None:
         unplanned_downtimes=[],
         total_count=500,
         good_count=475,
-        ideal_cycle_time_seconds=Decimal(27),
+        ideal_time_total_seconds=Decimal(13500),  # 27s x 500
     )
 
     assert result.planned_production_time_seconds == 27000
@@ -98,7 +98,7 @@ def test_unplanned_downtime_reduces_run_time_but_not_planned_production_time() -
         unplanned_downtimes=[machine_fault],
         total_count=480,
         good_count=432,
-        ideal_cycle_time_seconds=Decimal(27),
+        ideal_time_total_seconds=Decimal(12960),  # 27s x 480
     )
 
     assert result.planned_production_time_seconds == 28800
@@ -131,7 +131,7 @@ def test_overlapping_unplanned_downtimes_are_not_double_counted() -> None:
         unplanned_downtimes=[fault_a, fault_b],
         total_count=300,
         good_count=270,
-        ideal_cycle_time_seconds=Decimal(39),
+        ideal_time_total_seconds=Decimal(11700),  # 39s x 300
     )
 
     assert result.run_time_seconds == 23400  # no 21600 (28800 - 7200)
@@ -161,7 +161,7 @@ def test_open_event_is_clipped_using_window_end_as_default_as_of() -> None:
         unplanned_downtimes=[still_running],
         total_count=300,
         good_count=270,
-        ideal_cycle_time_seconds=Decimal(45),
+        ideal_time_total_seconds=Decimal(13500),  # 45s x 300
     )
 
     assert result.run_time_seconds == 27000
@@ -180,7 +180,7 @@ def test_explicit_as_of_closes_open_event_before_window_end() -> None:
         unplanned_downtimes=[still_running],
         total_count=100,
         good_count=100,
-        ideal_cycle_time_seconds=Decimal(1),
+        ideal_time_total_seconds=Decimal(100),  # 1s x 100
         as_of=at(13, 20),
     )
 
@@ -203,7 +203,7 @@ def test_performance_over_100_percent_keeps_raw_value_and_adds_capped_with_warni
         unplanned_downtimes=[],
         total_count=900,
         good_count=810,
-        ideal_cycle_time_seconds=Decimal(40),
+        ideal_time_total_seconds=Decimal(36000),  # 40s x 900
     )
 
     assert result.planned_production_time_seconds == 28800
@@ -227,7 +227,7 @@ def test_zero_total_count_quality_is_none_with_warning() -> None:
         unplanned_downtimes=[],
         total_count=0,
         good_count=0,
-        ideal_cycle_time_seconds=Decimal(30),
+        ideal_time_total_seconds=Decimal(0),  # 30s x 0
     )
 
     assert result.quality is None
@@ -252,7 +252,7 @@ def test_zero_planned_production_time_cascades_to_availability_and_performance()
         unplanned_downtimes=[],
         total_count=100,
         good_count=90,
-        ideal_cycle_time_seconds=Decimal(10),
+        ideal_time_total_seconds=Decimal(1000),  # 10s x 100
     )
 
     assert result.planned_production_time_seconds == 0
@@ -276,7 +276,7 @@ def test_zero_run_time_performance_is_none_even_when_ppt_is_positive() -> None:
         unplanned_downtimes=[downtime_covers_everything],
         total_count=100,
         good_count=90,
-        ideal_cycle_time_seconds=Decimal(10),
+        ideal_time_total_seconds=Decimal(1000),  # 10s x 100
     )
 
     assert result.planned_production_time_seconds == 28800
@@ -299,7 +299,7 @@ def test_degenerate_span_with_end_before_or_equal_start_is_ignored_not_raised() 
         unplanned_downtimes=[degenerate, real_downtime],
         total_count=10,
         good_count=10,
-        ideal_cycle_time_seconds=Decimal(1),
+        ideal_time_total_seconds=Decimal(10),  # 1s x 10
     )
 
     assert result.run_time_seconds == 28800 - 1800
@@ -313,7 +313,7 @@ def test_negative_total_count_raises_value_error() -> None:
             unplanned_downtimes=[],
             total_count=-1,
             good_count=0,
-            ideal_cycle_time_seconds=Decimal(1),
+            ideal_time_total_seconds=Decimal(1),
         )
 
 
@@ -325,7 +325,7 @@ def test_negative_good_count_raises_value_error() -> None:
             unplanned_downtimes=[],
             total_count=10,
             good_count=-1,
-            ideal_cycle_time_seconds=Decimal(1),
+            ideal_time_total_seconds=Decimal(10),
         )
 
 
@@ -337,17 +337,17 @@ def test_good_count_greater_than_total_count_raises_value_error() -> None:
             unplanned_downtimes=[],
             total_count=10,
             good_count=11,
-            ideal_cycle_time_seconds=Decimal(1),
+            ideal_time_total_seconds=Decimal(10),
         )
 
 
 def test_negative_ideal_cycle_time_raises_value_error() -> None:
-    with pytest.raises(ValueError, match="ideal_cycle_time_seconds"):
+    with pytest.raises(ValueError, match="ideal_time_total_seconds"):
         calculate_oee(
             window=WINDOW,
             planned_downtimes=[],
             unplanned_downtimes=[],
             total_count=10,
             good_count=10,
-            ideal_cycle_time_seconds=Decimal(-1),
+            ideal_time_total_seconds=Decimal(-10),
         )

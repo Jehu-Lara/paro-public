@@ -46,22 +46,20 @@ def _require_aware(value: datetime, field: str) -> None:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
-def _weighted_ideal_cycle_time(records: list[ProductionRecord]) -> Decimal:
-    """Promedio de ``ideal_cycle_time_seconds`` ponderado por ``total_count``.
+def _ideal_time_total_seconds(records: list[ProductionRecord]) -> Decimal:
+    """Exact sum of ``ideal_cycle_time_seconds * total_count`` per record.
 
-    Es lo unico que preserva ``ideal_cycle_time_seconds * total_count`` como
-    el tiempo ideal total agregado, que es lo que ``Performance`` realmente
-    usa (ver plan de la tarea). ``Decimal("0")`` si no hay conteo: en ese
-    caso el dominio ya emite ``ZERO_TOTAL_COUNT``/``ZERO_RUN_TIME`` y el
-    valor no afecta el resultado.
+    This is the aggregate ideal time that ``Performance`` uses (see
+    ``domain/oee.py``). Never averaged or divided by ``total_count``:
+    dividing to average and letting the domain multiply back loses
+    precision in the general case (the quotient may have no finite decimal
+    representation). ``Decimal("0")`` when there are no records, no special
+    case needed: ``sum`` over an empty list already returns the start
+    value.
     """
-    total = sum(record.total_count for record in records)
-    if total == 0:
-        return Decimal("0")
-    weighted_sum = sum(
+    return sum(
         (record.ideal_cycle_time_seconds * record.total_count for record in records), Decimal("0")
     )
-    return weighted_sum / total
 
 
 @router.get("/oee", response_model=OEEResponse)
@@ -114,7 +112,7 @@ def get_oee(
     )
     total_count = sum(record.total_count for record in production_records)
     good_count = sum(record.good_count for record in production_records)
-    ideal_cycle_time_seconds = _weighted_ideal_cycle_time(production_records)
+    ideal_time_total_seconds = _ideal_time_total_seconds(production_records)
 
     result = calculate_oee(
         window=Interval(start, end),
@@ -122,7 +120,7 @@ def get_oee(
         unplanned_downtimes=unplanned_downtimes,
         total_count=total_count,
         good_count=good_count,
-        ideal_cycle_time_seconds=ideal_cycle_time_seconds,
+        ideal_time_total_seconds=ideal_time_total_seconds,
     )
 
     return OEEResponse(

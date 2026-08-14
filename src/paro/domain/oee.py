@@ -16,6 +16,13 @@ produce ``None`` en ese componente y una advertencia nombrada en
 ``OeeResult.warnings`` (ver :mod:`paro.domain.warnings`). ``Performance`` por
 encima de 100% se conserva crudo junto con una version limitada a 100% para
 presentacion, nunca se recorta en silencio.
+
+``calculate_oee`` receives Ideal Cycle Time already aggregated (``Ideal
+Cycle Time x Total Count``, summed exactly by the caller when there are
+several production records) instead of a per-unit value: the engine never
+divides to reconstruct a weighted average, because that quotient may have
+no finite decimal representation and a later multiplication does not
+recover the precision already lost.
 """
 
 from __future__ import annotations
@@ -108,7 +115,7 @@ def calculate_oee(
     unplanned_downtimes: list[DowntimeSpan],
     total_count: int,
     good_count: int,
-    ideal_cycle_time_seconds: Decimal,
+    ideal_time_total_seconds: Decimal,
     as_of: datetime | None = None,
 ) -> OeeResult:
     """Calcula OEE para ``window`` a partir de paros y conteos de produccion.
@@ -117,13 +124,18 @@ def calculate_oee(
     ``window`` (documentado como la regla determinista para eventos abiertos).
     Los paros ya deben llegar separados en planeados/no planeados: esa
     clasificacion es un dato del evento, no algo que el motor de OEE decida.
+
+    ``ideal_time_total_seconds`` is ``Ideal Cycle Time x Total Count``
+    already aggregated by the caller (see the module docstring): the engine
+    uses it directly in ``Performance``, without dividing or multiplying by
+    ``total_count``.
     """
     if total_count < 0 or good_count < 0:
         raise ValueError("total_count y good_count no pueden ser negativos.")
     if good_count > total_count:
         raise ValueError(f"good_count ({good_count}) no puede superar total_count ({total_count}).")
-    if ideal_cycle_time_seconds < 0:
-        raise ValueError("ideal_cycle_time_seconds no puede ser negativo.")
+    if ideal_time_total_seconds < 0:
+        raise ValueError("ideal_time_total_seconds no puede ser negativo.")
 
     resolved_as_of = as_of if as_of is not None else window.end
 
@@ -154,7 +166,7 @@ def calculate_oee(
         performance_capped = None
         warnings_found.append(Warning.ZERO_RUN_TIME)
     else:
-        performance_raw = (ideal_cycle_time_seconds * total_count) / Decimal(run_time_seconds)
+        performance_raw = ideal_time_total_seconds / Decimal(run_time_seconds)
         if performance_raw > 1:
             performance_capped = Decimal(1)
             warnings_found.append(Warning.PERFORMANCE_OVER_100)

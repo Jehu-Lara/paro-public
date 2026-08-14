@@ -12,10 +12,10 @@ from decimal import Decimal
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine
+from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
-from paro.api.routers.oee import get_oee
+from paro.api.routers.oee import _ideal_time_total_seconds, get_oee
 from paro.db.models import DowntimeEvent, DowntimeReason, ProductionLine, ProductionRecord
 from paro.domain.intervals import Interval
 from paro.domain.oee import DowntimeSpan, calculate_oee
@@ -145,9 +145,8 @@ def test_get_oee_matches_direct_domain_call(client: TestClient, migrated_engine:
     # Solo los dos registros totalmente contenidos participan; el parcial se excluye.
     total_count = 5000 + 100
     good_count = 4800 + 95
-    ideal_cycle_time_seconds = (Decimal("5.500") * 5000 + Decimal("10.000") * 100) / Decimal(
-        total_count
-    )
+    # Exact sum, never divided by total_count (see B1 / domain/oee.py).
+    ideal_time_total_seconds = Decimal("5.500") * 5000 + Decimal("10.000") * 100
 
     expected = calculate_oee(
         window=Interval(WINDOW_START, WINDOW_END),
@@ -159,7 +158,7 @@ def test_get_oee_matches_direct_domain_call(client: TestClient, migrated_engine:
         ],
         total_count=total_count,
         good_count=good_count,
-        ideal_cycle_time_seconds=ideal_cycle_time_seconds,
+        ideal_time_total_seconds=ideal_time_total_seconds,
     )
 
     assert body["line_id"] == line_id
@@ -178,6 +177,71 @@ def test_get_oee_matches_direct_domain_call(client: TestClient, migrated_engine:
         raw = body[key]
         parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
         assert parsed.utcoffset() == timedelta(0)
+
+
+def test_ideal_time_total_seconds_sums_exactly_without_averaging(
+    migrated_engine: Engine,
+) -> None:
+    """``_ideal_time_total_seconds`` must sum exactly, never average and round.
+
+    Three records with ``total_count=1`` each and ``ideal_cycle_time_seconds``
+    10/10/30 (contributions 10, 10, 30) give a per-unit weighted average of
+    50/3, a non-terminating decimal. Verified empirically that dividing by 3
+    and multiplying back by 3 does NOT reproduce 50 exactly under
+    ``Decimal``'s default context (drifts by ``1E-26``): that is precisely
+    the round-trip this function must never perform.
+    """
+    with Session(migrated_engine) as session:
+        line = _seed_line(session)
+        session.add_all(
+            [
+                ProductionRecord(
+                    line_id=line.id,
+                    interval_start=WINDOW_START,
+                    interval_end=WINDOW_END,
+                    total_count=1,
+                    good_count=1,
+                    ideal_cycle_time_seconds=Decimal("10.000"),
+                ),
+                ProductionRecord(
+                    line_id=line.id,
+                    interval_start=WINDOW_START,
+                    interval_end=WINDOW_END,
+                    total_count=1,
+                    good_count=1,
+                    ideal_cycle_time_seconds=Decimal("10.000"),
+                ),
+                ProductionRecord(
+                    line_id=line.id,
+                    interval_start=WINDOW_START,
+                    interval_end=WINDOW_END,
+                    total_count=1,
+                    good_count=1,
+                    ideal_cycle_time_seconds=Decimal("30.000"),
+                ),
+            ]
+        )
+        session.commit()
+        line_id = line.id
+
+    with Session(migrated_engine) as session:
+        records = list(
+            session.scalars(
+                select(ProductionRecord).where(
+                    ProductionRecord.line_id == line_id,
+                    ProductionRecord.interval_start >= WINDOW_START,
+                    ProductionRecord.interval_end <= WINDOW_END,
+                )
+            ).all()
+        )
+
+    assert _ideal_time_total_seconds(records) == Decimal(50)
+
+    # Why this matters: dividing by 3 and multiplying back by 3 does not
+    # reproduce 50 exactly under Decimal's default context -- the round-trip
+    # this function avoids by construction.
+    lossy_round_trip = (Decimal(50) / Decimal(3)) * 3
+    assert lossy_round_trip != Decimal(50)
 
 
 def test_get_oee_unknown_line_returns_404(client: TestClient) -> None:
@@ -217,7 +281,7 @@ def test_get_oee_line_without_data_returns_200_with_warnings(
         unplanned_downtimes=[],
         total_count=0,
         good_count=0,
-        ideal_cycle_time_seconds=Decimal("0"),
+        ideal_time_total_seconds=Decimal("0"),
     )
 
     assert expected.quality is None

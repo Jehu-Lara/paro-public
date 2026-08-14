@@ -30,7 +30,12 @@ OEE          = Availability x Performance x Quality
 - **Unplanned downtimes** - unscheduled stops (machine faults). Subtracted
   from Planned Production Time to get Run Time.
 - **Ideal Cycle Time** - the theoretical time to produce one unit, in
-  seconds.
+  seconds. `calculate_oee` receives it already multiplied by Total Count
+  (`ideal_time_total_seconds`), aggregated exactly across every production
+  record in the window - the function itself never averages a per-unit
+  value and divides to reconstruct it, since that division may not have a
+  finite decimal representation and no amount of precision recovers what
+  a later multiplication already lost.
 - **Total Count** - total units produced (good + rejected) during the
   window.
 - **Good Count** - units produced that passed quality, `<= Total Count`.

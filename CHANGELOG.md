@@ -8,6 +8,25 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `GET /api/v1/oee`'s `Performance` component lost precision whenever a
+  window had more than one `production_record` with different
+  `ideal_cycle_time_seconds`: `routers/oee.py` computed a weighted average
+  (`weighted_sum / total_count`, a division) and `domain/oee.py` multiplied
+  it back by `total_count` to recover the aggregate ideal time. That
+  divide-then-multiply round-trip is lossy whenever the average has no
+  finite decimal representation - verified empirically with `Decimal(50) /
+  Decimal(3) * 3 != Decimal(50)` (drifts by `1E-26` under the default
+  context), and no increase in `Decimal` precision fixes it, since the
+  quotient itself is already an approximation. Fixed at the root instead of
+  patched: `calculate_oee`'s `ideal_cycle_time_seconds` parameter is now
+  `ideal_time_total_seconds` - the aggregate ideal time, already summed
+  exactly by the caller (`routers/oee.py::_ideal_time_total_seconds`, no
+  longer named "weighted", no longer divides). The domain function never
+  reconstructs an average; it consumes the exact sum directly. New
+  regression test (`tests/integration/test_api_oee.py`) asserts the
+  aggregation returns the exact literal sum for a case whose per-unit
+  average is non-terminating, which the previous implementation could not
+  have guaranteed.
 - `production_record.ideal_cycle_time_seconds` now has a database-level
   `CHECK (ideal_cycle_time_seconds >= 0)` constraint (migration 0003), so a
   negative value is rejected regardless of the insertion path, not only
