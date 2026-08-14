@@ -1,0 +1,35 @@
+# Entornos y dependencias
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Base de datos SQLite local (pivote temporal, ver ADR 0002). Nunca se versiona.
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Secretos: NUNCA versionar. Solo .env.example va al repo.
+.env
+.env.*
+!.env.example
+
+# Herramientas
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Editores / SO
+.idea/
+.vscode/
+Thumbs.db
+desktop.ini
+
+# Ruido conocido de este entorno Windows (Git Bash crea 'nul' como archivo real).
+nul
+

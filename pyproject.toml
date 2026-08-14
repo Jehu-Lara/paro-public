@@ -1,0 +1,83 @@
+[project]
+name = "paro"
+# Fuente unica de verdad de la version: src/paro/__init__.py
+dynamic = ["version"]
+description = "Plataforma de datos operacionales para manufactura: captura de paros de linea y calculo determinista de OEE."
+readme = "README.md"
+requires-python = ">=3.14"
+license = { text = "MIT" }
+
+# Dependencias de runtime. Cada una lleva su justificacion en linea.
+dependencies = [
+    "fastapi>=0.120",          # capa HTTP + OpenAPI generado
+    "uvicorn[standard]>=0.38",  # servidor ASGI para desarrollo y contenedor
+    "pydantic>=2.12",           # validacion de entrada/salida de la API
+    "pydantic-settings>=2.12",  # configuracion por variables de entorno
+    "sqlalchemy>=2.0.51",       # ORM sincrono tipado (wheels cp314 desde 2.0.51)
+    "psycopg[binary]>=3.3.4",   # driver PostgreSQL 3 (soporte 3.14 desde 3.3.4)
+    "alembic>=1.17",            # migraciones versionadas
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.4",
+    "pytest-cov>=7.0",
+    "httpx2>=0.29",  # cliente que exige starlette.testclient (httpx quedo deprecado)
+    "ruff>=0.14",
+    "mypy>=1.18",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/paro/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/paro"]
+
+[tool.uv]
+# Usa el interprete ya instalado en el sistema (3.14.7) en lugar de descargar
+# uno gestionado por uv. Ver docs/adr/0001-python-314.md.
+python-preference = "system"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4",
+    "pytest-cov>=7.0",
+    "httpx2>=0.29",
+    "ruff>=0.14",
+    "mypy>=1.18",
+]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+target-version = "py314"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "SIM", # flake8-simplify
+    "RUF",
+]
+
+[tool.mypy]
+python_version = "3.14"
+files = ["src"]
+strict = true
+warn_unreachable = true
+show_error_codes = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+pythonpath = ["."]
+
+[tool.coverage.report]
+show_missing = true
