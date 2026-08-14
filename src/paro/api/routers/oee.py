@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session
 from paro.api.deps import get_db
 from paro.api.schemas.oee import OEEResponse
 from paro.db.models import DowntimeEvent, ProductionLine, ProductionRecord
-from paro.domain.intervals import Interval
+from paro.domain.intervals import Interval, require_aware
 from paro.domain.oee import DowntimeSpan, calculate_oee
 
 __all__ = ["router"]
@@ -35,8 +35,15 @@ router = APIRouter(prefix="/api/v1", tags=["oee"])
 
 
 def _require_aware(value: datetime, field: str) -> None:
-    if value.tzinfo is None:
-        raise HTTPException(status_code=422, detail=f"{field} debe ser tz-aware.")
+    """Delegates to domain.intervals.require_aware; ValueError becomes 422.
+
+    Keeps the router rejecting exactly what the domain would reject later
+    when it builds ``Interval`` -- no separate, weaker tz-aware check here.
+    """
+    try:
+        require_aware(value, field)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 def _weighted_ideal_cycle_time(records: list[ProductionRecord]) -> Decimal:

@@ -6,13 +6,16 @@ y exclusion de registros de produccion parcialmente solapados.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, tzinfo
 from decimal import Decimal
 
+import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
+from paro.api.routers.oee import get_oee
 from paro.db.models import DowntimeEvent, DowntimeReason, ProductionLine, ProductionRecord
 from paro.domain.intervals import Interval
 from paro.domain.oee import DowntimeSpan, calculate_oee
@@ -251,3 +254,38 @@ def test_get_oee_rejects_end_before_start(client: TestClient, migrated_engine: E
         },
     )
     assert response.status_code == 422
+
+
+class _BrokenTzinfo(tzinfo):
+    """Same broken ``tzinfo`` as ``tests/unit/test_intervals.py``: not
+    ``None``, but ``utcoffset()`` is. No real HTTP query string can produce
+    this -- Pydantic only ever builds ``datetime.timezone`` (valid offset)
+    or leaves the datetime naive -- so this can't be reproduced through
+    ``TestClient``. Calls the actual router function directly instead.
+    """
+
+    def utcoffset(self, dt: datetime | None) -> timedelta | None:
+        return None
+
+    def dst(self, dt: datetime | None) -> timedelta | None:
+        return None
+
+    def tzname(self, dt: datetime | None) -> str | None:
+        return "broken"
+
+
+# NOTE: calls the router function directly, not via HTTP -- see docstring.
+def test_get_oee_rejects_tzinfo_with_none_utcoffset_as_422_not_500(
+    migrated_engine: Engine,
+) -> None:
+    with Session(migrated_engine) as session:
+        line = _seed_line(session)
+        session.commit()
+        line_id = line.id
+
+    broken_start = datetime(2026, 8, 10, 22, 0, tzinfo=_BrokenTzinfo())
+
+    with Session(migrated_engine) as session, pytest.raises(HTTPException) as exc_info:
+        get_oee(line_id=line_id, start=broken_start, end=WINDOW_END, db=session)
+
+    assert exc_info.value.status_code == 422

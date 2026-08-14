@@ -4,7 +4,7 @@ Todos los timestamps se pasan explicitamente; ningun test depende de
 ``datetime.now()`` ni de la hora en la que se ejecuta.
 """
 
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone, tzinfo
 
 import pytest
 
@@ -23,6 +23,29 @@ def test_interval_rejects_naive_datetime() -> None:
     naive = datetime(2026, 1, 1, 8, 0)  # sin tzinfo
     with pytest.raises(ValueError, match="tz-aware"):
         Interval(naive, at(9))
+
+
+class _BrokenTzinfo(tzinfo):
+    """``tzinfo`` that is not ``None`` but whose ``utcoffset()`` is.
+
+    Reproduces the case ``tzinfo is None`` doesn't cover: a tz-like object
+    present but unable to resolve a real offset.
+    """
+
+    def utcoffset(self, dt: datetime | None) -> timedelta | None:
+        return None
+
+    def dst(self, dt: datetime | None) -> timedelta | None:
+        return None
+
+    def tzname(self, dt: datetime | None) -> str | None:
+        return "broken"
+
+
+def test_interval_rejects_tzinfo_with_none_utcoffset() -> None:
+    broken = datetime(2026, 1, 1, 8, 0, tzinfo=_BrokenTzinfo())
+    with pytest.raises(ValueError, match="tz-aware"):
+        Interval(broken, at(9))
 
 
 def test_interval_rejects_end_before_or_equal_start() -> None:

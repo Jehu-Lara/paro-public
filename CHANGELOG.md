@@ -21,3 +21,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   boundary (`api/routers/oee.py`). No behavior change: `Warning` is a
   `StrEnum`, so JSON serialization and equality against string values are
   unaffected.
+- `GET /api/v1/oee` had a weaker tz-aware check (`tzinfo is None`) than
+  `domain/intervals.py` (`tzinfo is None or tzinfo.utcoffset(moment) is
+  None`), so a `tzinfo` present but unable to resolve a real offset would
+  pass the router's check and raise an unhandled `ValueError` deep in the
+  domain, turning into a 500 instead of a 422. `domain/intervals.py` now
+  exposes `require_aware` (was private); the router delegates to it and
+  converts `ValueError` into `HTTPException(422)`, instead of reimplementing
+  a looser version of the same check.

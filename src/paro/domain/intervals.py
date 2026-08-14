@@ -18,10 +18,18 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-__all__ = ["Interval", "clip", "duration_seconds", "subtract", "total_seconds", "union"]
+__all__ = [
+    "Interval",
+    "clip",
+    "duration_seconds",
+    "require_aware",
+    "subtract",
+    "total_seconds",
+    "union",
+]
 
 
-def _require_aware(moment: datetime, field: str) -> datetime:
+def require_aware(moment: datetime, field: str) -> datetime:
     """Valida que ``moment`` sea tz-aware y lo normaliza a UTC."""
     if moment.tzinfo is None or moment.tzinfo.utcoffset(moment) is None:
         raise ValueError(
@@ -43,8 +51,8 @@ class Interval:
     end: datetime
 
     def __post_init__(self) -> None:
-        start = _require_aware(self.start, "start")
-        end = _require_aware(self.end, "end")
+        start = require_aware(self.start, "start")
+        end = require_aware(self.end, "end")
         if end <= start:
             raise ValueError(
                 f"Un intervalo requiere end > start; se recibio start={start.isoformat()} "
