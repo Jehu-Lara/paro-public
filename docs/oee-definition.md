@@ -55,8 +55,12 @@ to the end of the window.
 
 OEE never turns a data problem into a silent `0.0`, and never raises an
 uncontrolled exception for one. Instead, the affected component becomes
-`None` and a named warning is added to `OeeResult.warnings`
-(`src/paro/domain/warnings.py`):
+`None` and a named warning is added (`src/paro/domain/warnings.py`).
+Most of these come straight from `OeeResult.warnings`; the last one below
+is the exception - `calculate_oee` only ever sees already-aggregated
+totals, so `GET /oee` (`src/paro/api/routers/oee.py`) detects it itself,
+before the aggregation happens, and adds it to the same `warnings` list
+in the response:
 
 | Warning | Condition | Effect |
 | --- | --- | --- |
@@ -65,6 +69,7 @@ uncontrolled exception for one. Instead, the affected component becomes
 | `ZERO_TOTAL_COUNT` | Total Count is zero | Quality is `None` |
 | `PERFORMANCE_OVER_100` | Raw Performance exceeds 100% | Raw value is kept as-is; a separate value capped at 100% is also provided for presentation |
 | `OPEN_EVENT_CLIPPED` | At least one downtime had no `ended_at` | The event was closed using `as_of` to include it in the calculation |
+| `PARTIAL_PRODUCTION_EXCLUDED` | A `production_record` overlaps the requested window but isn't fully contained in it | The whole record is excluded from Total Count/Good Count/Ideal Cycle Time, not partially counted |
 
 `OEE` itself is only computed when Availability, Performance (raw, not
 capped), and Quality are all calculable; otherwise it is `None`.

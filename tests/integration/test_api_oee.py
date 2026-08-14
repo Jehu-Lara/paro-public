@@ -169,7 +169,10 @@ def test_get_oee_matches_direct_domain_call(client: TestClient, migrated_engine:
     assert _decimal_field(body, "oee") == expected.oee
     assert body["planned_production_time_seconds"] == expected.planned_production_time_seconds
     assert body["run_time_seconds"] == expected.run_time_seconds
-    assert body["warnings"] == expected.warnings
+    # The fixture's third production record overlaps the window but isn't
+    # fully contained (see _seed_full_scenario) -- the router detects that
+    # exclusion itself and appends it after calculate_oee's own warnings.
+    assert body["warnings"] == [*expected.warnings, "PARTIAL_PRODUCTION_EXCLUDED"]
     assert "OPEN_EVENT_CLIPPED" in body["warnings"]
 
     # window_start/window_end deben llevar offset UTC explicito.
@@ -177,6 +180,74 @@ def test_get_oee_matches_direct_domain_call(client: TestClient, migrated_engine:
         raw = body[key]
         parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
         assert parsed.utcoffset() == timedelta(0)
+
+
+def test_get_oee_warns_when_a_production_record_only_partially_overlaps_window(
+    client: TestClient, migrated_engine: Engine
+) -> None:
+    """A record straddling the window edge is excluded whole, with a warning."""
+    with Session(migrated_engine) as session:
+        line = _seed_line(session)
+        session.add(
+            ProductionRecord(
+                line_id=line.id,
+                interval_start=PARTIAL_RECORD_START,
+                interval_end=PARTIAL_RECORD_END,
+                total_count=9999,
+                good_count=1,
+                ideal_cycle_time_seconds=Decimal("999.000"),
+            )
+        )
+        session.commit()
+        line_id = line.id
+
+    response = client.get(
+        "/api/v1/oee",
+        params={
+            "line_id": line_id,
+            "start": WINDOW_START.isoformat(),
+            "end": WINDOW_END.isoformat(),
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert "PARTIAL_PRODUCTION_EXCLUDED" in body["warnings"]
+    # ZERO_TOTAL_COUNT confirms the record was excluded, not partially counted.
+    assert "ZERO_TOTAL_COUNT" in body["warnings"]
+
+
+def test_get_oee_does_not_warn_when_all_production_records_are_fully_contained(
+    client: TestClient, migrated_engine: Engine
+) -> None:
+    """No false positive: a fully-contained record never triggers the warning."""
+    with Session(migrated_engine) as session:
+        line = _seed_line(session)
+        session.add(
+            ProductionRecord(
+                line_id=line.id,
+                interval_start=WINDOW_START,
+                interval_end=WINDOW_END,
+                total_count=100,
+                good_count=95,
+                ideal_cycle_time_seconds=Decimal("10.000"),
+            )
+        )
+        session.commit()
+        line_id = line.id
+
+    response = client.get(
+        "/api/v1/oee",
+        params={
+            "line_id": line_id,
+            "start": WINDOW_START.isoformat(),
+            "end": WINDOW_END.isoformat(),
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert "PARTIAL_PRODUCTION_EXCLUDED" not in body["warnings"]
 
 
 def test_ideal_time_total_seconds_sums_exactly_without_averaging(

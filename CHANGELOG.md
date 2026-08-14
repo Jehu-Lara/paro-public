@@ -46,6 +46,28 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- `GET /api/v1/oee` silently excluded any `production_record` that
+  overlapped the requested window without being fully contained in it
+  (`interval_start >= start AND interval_end <= end` was the only filter)
+  - the whole record dropped out of `Total Count`/`Good Count`/`Ideal
+    Cycle Time` with no signal to the caller that data was missing.
+  `domain/warnings.py`'s `Warning` enum gets a new member,
+  `PARTIAL_PRODUCTION_EXCLUDED`, added to the response's `warnings` list
+  whenever this happens. It's detected by the router
+  (`src/paro/api/routers/oee.py`), not `calculate_oee`: the domain
+  function only ever receives already-aggregated totals and has no
+  visibility into individual rows, so it can't detect this itself -
+  reusing the shared `Warning` vocabulary instead of inventing a second,
+  router-only warnings concept keeps `OEEResponse.warnings` one list with
+  one meaning. Implementation-wise, the existing `production_record`
+  query is widened once from full-containment to overlap
+  (`interval_start < end AND interval_end > start`) and the result is
+  split in Python into the full-containment subset (used for aggregation,
+  unchanged) and the wider overlap set (used only to detect whether
+  anything got excluded) - one query, not two. No change to
+  `domain/oee.py` or `calculate_oee`'s signature; `downtime_event`
+  already used an overlap query and didn't need this fix.
+
 - `GET /api/v1/oee`'s `Performance` component lost precision whenever a
   window had more than one `production_record` with different
   `ideal_cycle_time_seconds`: `routers/oee.py` computed a weighted average

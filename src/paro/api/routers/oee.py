@@ -29,6 +29,7 @@ from paro.api.schemas.oee import OEEResponse
 from paro.db.models import DowntimeEvent, ProductionLine, ProductionRecord
 from paro.domain.intervals import Interval, require_aware
 from paro.domain.oee import DowntimeSpan, calculate_oee
+from paro.domain.warnings import Warning
 
 __all__ = ["router"]
 
@@ -102,15 +103,20 @@ def get_oee(
         if not event.is_planned
     ]
 
-    production_records = list(
+    production_records_overlapping = list(
         db.scalars(
             select(ProductionRecord).where(
                 ProductionRecord.line_id == line_id,
-                ProductionRecord.interval_start >= start,
-                ProductionRecord.interval_end <= end,
+                ProductionRecord.interval_start < end,
+                ProductionRecord.interval_end > start,
             )
         ).all()
     )
+    production_records = [
+        record
+        for record in production_records_overlapping
+        if record.interval_start >= start and record.interval_end <= end
+    ]
     total_count = sum(record.total_count for record in production_records)
     good_count = sum(record.good_count for record in production_records)
     ideal_time_total_seconds = _ideal_time_total_seconds(production_records)
@@ -124,6 +130,10 @@ def get_oee(
         ideal_time_total_seconds=ideal_time_total_seconds,
     )
 
+    warnings = list(result.warnings)
+    if len(production_records) < len(production_records_overlapping):
+        warnings.append(Warning.PARTIAL_PRODUCTION_EXCLUDED)
+
     return OEEResponse(
         line_id=line_id,
         window_start=start,
@@ -135,5 +145,5 @@ def get_oee(
         oee=result.oee,
         planned_production_time_seconds=result.planned_production_time_seconds,
         run_time_seconds=result.run_time_seconds,
-        warnings=list(result.warnings),
+        warnings=warnings,
     )
