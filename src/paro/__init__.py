@@ -1,3 +1,3 @@
-"""PARO - plataforma de datos operacionales para manufactura."""
+"""PARO - operational data platform for manufacturing."""
 
 __version__ = "0.1.0"

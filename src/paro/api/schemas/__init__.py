@@ -1,1 +1,1 @@
-"""Schemas Pydantic de entrada/salida de la API. Nunca exponen modelos ORM."""
+"""Pydantic input/output schemas for the API. Never expose ORM models."""

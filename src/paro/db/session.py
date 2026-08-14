@@ -1,9 +1,10 @@
-"""Engine y factoria de sesiones de SQLAlchemy.
+"""SQLAlchemy engine and session factory.
 
-SQLite no aplica llaves foraneas por defecto: sin el ``PRAGMA foreign_keys=ON``
-en cada conexion, un ``machine_id`` invalido se inserta en silencio y ninguna
-prueba lo detecta hasta correr contra PostgreSQL. El listener solo actua sobre
-SQLite; PostgreSQL ya aplica FKs sin configuracion adicional.
+SQLite doesn't enforce foreign keys by default: without ``PRAGMA
+foreign_keys=ON`` on every connection, an invalid ``machine_id`` gets
+inserted silently and no test catches it until running against
+PostgreSQL. The listener only acts on SQLite; PostgreSQL already enforces
+FKs with no extra configuration.
 """
 
 from __future__ import annotations

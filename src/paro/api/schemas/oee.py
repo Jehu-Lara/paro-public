@@ -1,9 +1,10 @@
-"""Schema de salida para ``GET /oee``.
+"""Output schema for ``GET /oee``.
 
-El shape refleja exactamente ``paro.domain.oee.OeeResult`` (mismos campos,
-sin resumir ni renombrar) mas metadatos de la consulta (``line_id``,
-``window_start``, ``window_end``). Los ``Decimal`` se serializan como string
-para que no exista ambiguedad sobre si pasaron por ``float`` en algun punto.
+The shape mirrors ``paro.domain.oee.OeeResult`` exactly (same fields, no
+summarizing or renaming) plus query metadata (``line_id``,
+``window_start``, ``window_end``). ``Decimal`` values are serialized as
+strings so there's no ambiguity about whether they went through ``float``
+at any point.
 """
 
 from __future__ import annotations
@@ -27,7 +28,7 @@ _DECIMAL_FIELDS = (
 
 
 class OEEResponse(BaseModel):
-    """Resultado de OEE para una linea y ventana de tiempo dadas."""
+    """OEE result for a given line and time window."""
 
     line_id: int
     window_start: datetime
@@ -44,5 +45,5 @@ class OEEResponse(BaseModel):
 
     @field_serializer(*_DECIMAL_FIELDS)
     def _serialize_decimal(self, value: Decimal | None) -> str | None:
-        """Serializa como string: nunca pasa por ``float``, precision exacta."""
+        """Serializes as a string: never goes through ``float``, exact precision."""
         return None if value is None else str(value)

@@ -1,8 +1,8 @@
-"""Schemas de entrada/salida para ``production_record``.
+"""Input/output schemas for ``production_record``.
 
-``rejected_count`` nunca se envia ni se guarda: es ``total_count -
-good_count``, derivado en la respuesta con ``@computed_field`` para tener una
-sola fuente de verdad (igual que ``db/models.py`` ya documenta).
+``rejected_count`` is never sent nor stored: it's ``total_count -
+good_count``, derived in the response with ``@computed_field`` to keep a
+single source of truth (same as ``db/models.py`` already documents).
 """
 
 from __future__ import annotations
@@ -25,12 +25,12 @@ __all__ = ["ProductionRecordCreate", "ProductionRecordResponse"]
 
 def _require_aware(value: datetime, field: str) -> datetime:
     if value.tzinfo is None:
-        raise ValueError(f"{field} debe ser tz-aware; se recibio un datetime naive.")
+        raise ValueError(f"{field} must be tz-aware; received a naive datetime.")
     return value
 
 
 class ProductionRecordCreate(BaseModel):
-    """Payload de entrada para registrar un conteo de produccion."""
+    """Input payload to record a production count."""
 
     line_id: int
     interval_start: datetime
@@ -54,16 +54,16 @@ class ProductionRecordCreate(BaseModel):
     @model_validator(mode="after")
     def _validate_periods_and_counts(self) -> ProductionRecordCreate:
         if self.interval_end <= self.interval_start:
-            raise ValueError("interval_end debe ser mayor que interval_start.")
+            raise ValueError("interval_end must be greater than interval_start.")
         if self.good_count > self.total_count:
             raise ValueError(
-                f"good_count ({self.good_count}) no puede superar total_count ({self.total_count})."
+                f"good_count ({self.good_count}) cannot exceed total_count ({self.total_count})."
             )
         return self
 
 
 class ProductionRecordResponse(BaseModel):
-    """Representacion publica de un ``ProductionRecord`` persistido."""
+    """Public representation of a persisted ``ProductionRecord``."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -86,5 +86,5 @@ class ProductionRecordResponse(BaseModel):
 
     @field_serializer("ideal_cycle_time_seconds")
     def _serialize_decimal(self, value: Decimal) -> str:
-        """Serializa como string: nunca pasa por ``float``, precision exacta."""
+        """Serializes as a string: never goes through ``float``, exact precision."""
         return str(value)

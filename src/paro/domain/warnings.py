@@ -1,10 +1,10 @@
-"""Nombres de las advertencias de calidad de datos que emite el dominio.
+"""Names of the data-quality warnings the domain emits.
 
-El motor de OEE nunca oculta un problema de datos convirtiendolo en un ``0.0``
-silencioso ni lo esconde detras de una excepcion generica. En su lugar, el
-componente afectado se vuelve ``None`` y se agrega uno de estos nombres a
-``OeeResult.warnings``, para que quien consuma el resultado sepa exactamente
-que paso y por que.
+The OEE engine never hides a data problem by turning it into a silent
+``0.0``, nor does it hide it behind a generic exception. Instead, the
+affected component becomes ``None`` and one of these names is added to
+``OeeResult.warnings``, so whoever consumes the result knows exactly what
+happened and why.
 """
 
 from enum import StrEnum
@@ -13,22 +13,22 @@ __all__ = ["Warning"]
 
 
 class Warning(StrEnum):
-    """Advertencias nombradas que puede emitir :func:`paro.domain.oee.calculate_oee`."""
+    """Named warnings :func:`paro.domain.oee.calculate_oee` can emit."""
 
     ZERO_PLANNED_TIME = "ZERO_PLANNED_TIME"
-    """El tiempo de produccion planeado es cero: no se puede calcular Availability."""
+    """Planned production time is zero: Availability cannot be calculated."""
 
     ZERO_RUN_TIME = "ZERO_RUN_TIME"
-    """El tiempo operativo es cero: no se puede calcular Performance."""
+    """Run time is zero: Performance cannot be calculated."""
 
     ZERO_TOTAL_COUNT = "ZERO_TOTAL_COUNT"
-    """El conteo total es cero: no se puede calcular Quality."""
+    """Total count is zero: Quality cannot be calculated."""
 
     PERFORMANCE_OVER_100 = "PERFORMANCE_OVER_100"
-    """Performance crudo supera 100%; suele indicar un Ideal Cycle Time mal
-    configurado. Se conserva el valor crudo junto con uno limitado a 100%
-    para presentacion."""
+    """Raw Performance exceeds 100%; usually indicates a misconfigured
+    Ideal Cycle Time. The raw value is kept alongside one capped at 100%
+    for presentation."""
 
     OPEN_EVENT_CLIPPED = "OPEN_EVENT_CLIPPED"
-    """Al menos un evento de paro seguia abierto (sin fin) y se cerro usando
-    ``as_of`` para poder incluirlo en el calculo."""
+    """At least one downtime event was still open (no end) and was closed
+    using ``as_of`` so it could be included in the calculation."""

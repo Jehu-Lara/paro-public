@@ -1,21 +1,21 @@
-"""Motor determinista de OEE (Overall Equipment Effectiveness).
+"""Deterministic OEE (Overall Equipment Effectiveness) engine.
 
-Formulas (formato Vorne/oee.com, documentadas en ``docs/oee-definition.md``)::
+Formulas (Vorne/oee.com format, documented in ``docs/oee-definition.md``)::
 
-    Planned Production Time = duracion(ventana) - union(paros planeados ∩ ventana)
-    Run Time                = Planned Production Time - union(paros no planeados ∩ ventana)
+    Planned Production Time = duration(window) - union(planned downtimes ∩ window)
+    Run Time                = Planned Production Time - union(unplanned downtimes ∩ window)
 
     Availability = Run Time / Planned Production Time
     Performance  = (Ideal Cycle Time x Total Count) / Run Time
     Quality      = Good Count / Total Count
     OEE          = Availability x Performance x Quality
 
-Todo el modulo usa ``Decimal`` y segundos enteros: nunca ``float``. Un
-denominador en cero nunca produce ``0.0`` ni una excepcion sin controlar;
-produce ``None`` en ese componente y una advertencia nombrada en
-``OeeResult.warnings`` (ver :mod:`paro.domain.warnings`). ``Performance`` por
-encima de 100% se conserva crudo junto con una version limitada a 100% para
-presentacion, nunca se recorta en silencio.
+The whole module uses ``Decimal`` and whole seconds: never ``float``. A
+zero denominator never produces ``0.0`` nor an uncontrolled exception; it
+produces ``None`` in that component and a named warning in
+``OeeResult.warnings`` (see :mod:`paro.domain.warnings`). ``Performance``
+above 100% is kept raw alongside a version capped at 100% for
+presentation, never silently clipped.
 
 ``calculate_oee`` receives Ideal Cycle Time already aggregated (``Ideal
 Cycle Time x Total Count``, summed exactly by the caller when there are
@@ -39,11 +39,12 @@ __all__ = ["DowntimeSpan", "OeeResult", "calculate_oee"]
 
 @dataclass(frozen=True, slots=True)
 class DowntimeSpan:
-    """Un paro tal como llega del repositorio: puede seguir abierto.
+    """A downtime as it arrives from the repository: may still be open.
 
-    ``end is None`` representa un evento sin ``ended_at`` todavia. El motor lo
-    cierra usando ``as_of`` (ver :func:`calculate_oee`) en vez de fallar, porque
-    un turno en curso siempre tiene paros que todavia no terminan.
+    ``end is None`` represents an event with no ``ended_at`` yet. The
+    engine closes it using ``as_of`` (see :func:`calculate_oee`) instead
+    of failing, because a shift in progress always has downtimes that
+    haven't ended yet.
     """
 
     start: datetime
@@ -52,11 +53,11 @@ class DowntimeSpan:
 
 @dataclass(frozen=True, slots=True)
 class OeeResult:
-    """Resultado del calculo, con componentes, duraciones y advertencias.
+    """The calculation's result, with components, durations, and warnings.
 
-    Los componentes son ``Decimal | None``: ``None`` significa "no calculable
-    con estos datos", nunca "cero". ``oee`` solo tiene valor cuando los tres
-    componentes se pudieron calcular.
+    Components are ``Decimal | None``: ``None`` means "not calculable
+    with this data", never "zero". ``oee`` only has a value when all three
+    components could be calculated.
     """
 
     availability: Decimal | None
@@ -70,11 +71,12 @@ class OeeResult:
 
 
 def _resolve_span(span: DowntimeSpan, as_of: datetime) -> Interval | None:
-    """Cierra un ``DowntimeSpan`` en un ``Interval``, usando ``as_of`` si esta abierto.
+    """Closes a ``DowntimeSpan`` into an ``Interval``, using ``as_of`` if it's open.
 
-    Devuelve ``None`` cuando, tras resolver el fin, el intervalo queda vacio o
-    invertido (por ejemplo un evento que abrio despues de ``as_of``): eso es un
-    dato inusual, no un motivo para interrumpir el calculo de todo el reporte.
+    Returns ``None`` when, after resolving the end, the interval is empty
+    or inverted (e.g. an event that opened after ``as_of``): that's
+    unusual data, not a reason to interrupt the whole report's
+    calculation.
     """
     end = span.end if span.end is not None else as_of
     if end <= span.start:
@@ -97,11 +99,11 @@ def _resolve_spans(spans: list[DowntimeSpan], as_of: datetime) -> tuple[list[Int
 def _run_time_segments(
     planned_production_segments: list[Interval], unplanned_downtimes: list[Interval]
 ) -> list[Interval]:
-    """Resta los paros no planeados de cada tramo de tiempo planeado.
+    """Subtracts unplanned downtimes from each planned-time segment.
 
-    Se procesa tramo por tramo (en vez de tratar la ventana como un solo
-    intervalo) porque los paros planeados ya pudieron haber partido la ventana
-    en varios pedazos.
+    Processed segment by segment (instead of treating the window as a
+    single interval) because planned downtimes may already have split
+    the window into several pieces.
     """
     segments: list[Interval] = []
     for segment in planned_production_segments:
@@ -118,12 +120,12 @@ def calculate_oee(
     ideal_time_total_seconds: Decimal,
     as_of: datetime | None = None,
 ) -> OeeResult:
-    """Calcula OEE para ``window`` a partir de paros y conteos de produccion.
+    """Calculates OEE for ``window`` from downtimes and production counts.
 
-    ``as_of`` cierra los eventos todavia abiertos; por defecto es el fin de
-    ``window`` (documentado como la regla determinista para eventos abiertos).
-    Los paros ya deben llegar separados en planeados/no planeados: esa
-    clasificacion es un dato del evento, no algo que el motor de OEE decida.
+    ``as_of`` closes events still open; it defaults to ``window``'s end
+    (documented as the deterministic rule for open events). Downtimes
+    must already arrive split into planned/unplanned: that classification
+    is a fact about the event, not something the OEE engine decides.
 
     ``ideal_time_total_seconds`` is ``Ideal Cycle Time x Total Count``
     already aggregated by the caller (see the module docstring): the engine
@@ -131,11 +133,11 @@ def calculate_oee(
     ``total_count``.
     """
     if total_count < 0 or good_count < 0:
-        raise ValueError("total_count y good_count no pueden ser negativos.")
+        raise ValueError("total_count and good_count cannot be negative.")
     if good_count > total_count:
-        raise ValueError(f"good_count ({good_count}) no puede superar total_count ({total_count}).")
+        raise ValueError(f"good_count ({good_count}) cannot exceed total_count ({total_count}).")
     if ideal_time_total_seconds < 0:
-        raise ValueError("ideal_time_total_seconds no puede ser negativo.")
+        raise ValueError("ideal_time_total_seconds cannot be negative.")
 
     resolved_as_of = as_of if as_of is not None else window.end
 

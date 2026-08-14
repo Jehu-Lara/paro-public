@@ -1,1 +1,1 @@
-"""Routers de FastAPI, uno por recurso."""
+"""FastAPI routers, one per resource."""

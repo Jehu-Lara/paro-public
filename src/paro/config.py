@@ -1,8 +1,8 @@
-"""Configuracion de la aplicacion, leida de variables de entorno.
+"""Application configuration, read from environment variables.
 
-Toda la configuracion entra por el entorno (prefijo ``PARO_``) y nunca se
-codifica en el repositorio. ``.env.example`` documenta las variables; ``.env``
-esta ignorado por Git.
+All configuration comes from the environment (``PARO_`` prefix) and is
+never hardcoded in the repository. ``.env.example`` documents the
+variables; ``.env`` is gitignored.
 """
 
 from functools import lru_cache
@@ -11,13 +11,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Ajustes de la aplicacion.
+    """Application settings.
 
-    ``database_url`` por defecto apunta a un archivo SQLite local
-    (``./paro.db``). Es un pivote temporal documentado en
-    ``docs/adr/0002-sqlite-temporal-por-bloqueo-de-virtualizacion.md``: el
-    destino sigue siendo PostgreSQL, y basta con cambiar esta cadena de
-    conexion para volver a el.
+    ``database_url`` defaults to a local SQLite file (``./paro.db``). This
+    is a temporary pivot documented in
+    ``docs/adr/0002-sqlite-temporal-por-bloqueo-de-virtualizacion.md``: the
+    target is still PostgreSQL, and switching back is just a matter of
+    changing this connection string.
     """
 
     model_config = SettingsConfigDict(
@@ -35,9 +35,9 @@ class Settings(BaseSettings):
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
-    """Devuelve los ajustes en cache.
+    """Returns the cached settings.
 
-    Se cachea para no releer el entorno en cada request. Los tests que
-    necesiten otros valores deben llamar a ``get_settings.cache_clear()``.
+    Cached so the environment isn't re-read on every request. Tests that
+    need different values must call ``get_settings.cache_clear()``.
     """
     return Settings()

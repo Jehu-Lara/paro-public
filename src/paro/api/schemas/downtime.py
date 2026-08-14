@@ -1,9 +1,9 @@
-"""Schemas de entrada/salida para ``downtime_event``.
+"""Input/output schemas for ``downtime_event``.
 
-Los timestamps naive se rechazan aqui, en la frontera HTTP, con un 422 de
-Pydantic. Si se dejaran pasar, ``UTCDateTime`` los rechazaria mas tarde con un
-``ValueError`` sin controlar que terminaria como un 500 generico: un dato de
-entrada invalido del cliente nunca deberia parecer un fallo interno.
+Naive timestamps are rejected here, at the HTTP boundary, with a Pydantic
+422. If they were let through, ``UTCDateTime`` would reject them later
+with an uncontrolled ``ValueError`` that would end up as a generic 500: an
+invalid client input should never look like an internal failure.
 """
 
 from __future__ import annotations
@@ -17,12 +17,12 @@ __all__ = ["DowntimeEventCreate", "DowntimeEventResponse"]
 
 def _require_aware(value: datetime, field: str) -> datetime:
     if value.tzinfo is None:
-        raise ValueError(f"{field} debe ser tz-aware; se recibio un datetime naive.")
+        raise ValueError(f"{field} must be tz-aware; received a naive datetime.")
     return value
 
 
 class DowntimeEventCreate(BaseModel):
-    """Payload de entrada para registrar un evento de paro."""
+    """Input payload to record a downtime event."""
 
     line_id: int
     machine_id: int | None = None
@@ -49,12 +49,12 @@ class DowntimeEventCreate(BaseModel):
     @model_validator(mode="after")
     def _ended_after_started(self) -> DowntimeEventCreate:
         if self.ended_at is not None and self.ended_at <= self.started_at:
-            raise ValueError("ended_at debe ser mayor que started_at.")
+            raise ValueError("ended_at must be greater than started_at.")
         return self
 
 
 class DowntimeEventResponse(BaseModel):
-    """Representacion publica de un ``DowntimeEvent`` persistido."""
+    """Public representation of a persisted ``DowntimeEvent``."""
 
     model_config = ConfigDict(from_attributes=True)
 

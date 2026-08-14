@@ -67,6 +67,27 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Translated the remaining Spanish docstrings, comments, and
+  runtime-visible string literals in `src/` to English (25 files touched
+  across `api/`, `db/`, and `domain/`), matching this project's stated
+  convention that new text goes in English while existing text isn't
+  retroactively translated unless requested - now explicitly requested.
+  Filed under `refactor:` rather than `docs:` because 14 of the changed
+  strings are runtime-visible `ValueError`/`HTTPException` messages and
+  one FastAPI `summary` (shown in `/docs`), not just docstrings/comments;
+  not `fix:` because nothing was broken; not `test:` because the two
+  `tests/unit/test_oee.py` `match=` updates below are incidental to the
+  source change. No logic, status codes, or validation outcomes changed -
+  message wording only. `tests/unit/test_intervals.py`'s four `match=`
+  assertions needed no change (the new English wording keeps the matched
+  substrings `"tz-aware"` and `"end > start"` verbatim);
+  `tests/unit/test_oee.py`'s three `match=` assertions for negative/
+  excess-count validation were updated to track the new English wording
+  (`"no pueden ser negativos"` -> `"cannot be negative"`, `"no puede
+  superar"` -> `"cannot exceed"`). Out of scope: the two ADR files' Spanish
+  filenames remain untranslated (`docs/`, not `src/`) - a separate,
+  still-open remnant of the same original backlog item.
+
 - `db/session.py`'s engine and `sessionmaker` were built as a module-level
   side effect (`engine: Engine = _make_engine()` at import time), coupling
   merely importing the module to `get_settings()` already being resolved

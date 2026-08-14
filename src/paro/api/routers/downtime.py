@@ -1,4 +1,4 @@
-"""Router de ``downtime_event``."""
+"""Router for ``downtime_event``."""
 
 from __future__ import annotations
 
@@ -21,10 +21,10 @@ def post_downtime_event(
     response: Response,
     db: Session = Depends(get_db),  # noqa: B008
 ) -> DowntimeEventResponse:
-    """Registra un evento de paro.
+    """Records a downtime event.
 
-    Idempotente por ``(source, external_id)``: mismo payload -> 200 sin
-    duplicar fila, payload distinto con la misma clave -> 409 (ver
+    Idempotent by ``(source, external_id)``: same payload -> 200 without
+    duplicating the row, different payload with the same key -> 409 (see
     ``paro.api.errors``).
     """
     if db.get(ProductionLine, payload.line_id) is None:

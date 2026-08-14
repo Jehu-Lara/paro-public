@@ -1,10 +1,10 @@
-"""Tipos de columna compartidos entre dialectos.
+"""Column types shared across dialects.
 
-``domain/intervals.py`` rechaza cualquier ``datetime`` naive con ``ValueError``
-(ver ADR: los timestamps siempre son tz-aware en UTC). SQLite no tiene un tipo
-de fecha/hora nativo con zona horaria: guarda el valor y, al leerlo, devuelve
-un ``datetime`` naive. ``UTCDateTime`` cierra esa brecha en el borde de la
-base de datos para que el dominio nunca vea un naive, en ningun dialecto.
+``domain/intervals.py`` rejects any naive ``datetime`` with ``ValueError``
+(see ADR: timestamps are always tz-aware in UTC). SQLite has no native
+timezone-aware date/time type: it stores the value and, on read, returns
+a naive ``datetime``. ``UTCDateTime`` closes that gap at the database
+boundary so the domain never sees a naive one, on any dialect.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from sqlalchemy.types import TypeDecorator
 
 
 class UTCDateTime(TypeDecorator[datetime]):
-    """``DateTime`` que normaliza a UTC al escribir y reasigna UTC al leer."""
+    """``DateTime`` that normalizes to UTC on write and reassigns UTC on read."""
 
     impl = DateTime(timezone=True)
     cache_ok = True
@@ -27,7 +27,7 @@ class UTCDateTime(TypeDecorator[datetime]):
             return None
         if value.tzinfo is None:
             raise ValueError(
-                f"UTCDateTime requiere un datetime tz-aware; se recibio uno naive ({value!r})."
+                f"UTCDateTime requires a tz-aware datetime; received a naive one ({value!r})."
             )
         return value.astimezone(UTC)
 

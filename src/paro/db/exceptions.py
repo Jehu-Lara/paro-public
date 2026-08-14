@@ -1,9 +1,9 @@
-"""Excepciones de dominio de la capa de persistencia.
+"""Domain exceptions for the persistence layer.
 
-No son ``HTTPException``: la API (Sprint 3) las traduce a codigos de estado.
-Mantenerlas aqui, en vez de en ``paro.api``, evita que ``paro.db`` dependa de
-FastAPI y le da a quien llama suficiente informacion para construir un 409
-util sin volver a consultar la fila.
+They are not ``HTTPException``: the API (Sprint 3) translates them to
+status codes. Keeping them here, instead of in ``paro.api``, keeps
+``paro.db`` from depending on FastAPI and gives the caller enough
+information to build a useful 409 without re-querying the row.
 """
 
 from __future__ import annotations
@@ -14,12 +14,12 @@ __all__ = ["DuplicateWithDifferentPayloadError"]
 
 
 class DuplicateWithDifferentPayloadError(Exception):
-    """La clave de idempotencia (``source``, ``external_id``) ya existe con otros datos.
+    """The idempotency key (``source``, ``external_id``) already exists with different data.
 
-    Se lanza cuando un insert idempotente encuentra una fila existente con la
-    misma clave pero cuyos campos de negocio difieren del payload entrante
-    (ver ``paro.db.repositories``). Distinto de un simple duplicado: ese caso
-    es un no-op silencioso, no una excepcion.
+    Raised when an idempotent insert finds an existing row with the same
+    key but whose business fields differ from the incoming payload (see
+    ``paro.db.repositories``). Different from a plain duplicate: that case
+    is a silent no-op, not an exception.
     """
 
     def __init__(
@@ -36,6 +36,6 @@ class DuplicateWithDifferentPayloadError(Exception):
         self.differing_fields = differing_fields
         fields = ", ".join(sorted(differing_fields))
         super().__init__(
-            f"{entity}: source={source!r} external_id={external_id!r} ya existe con "
-            f"datos distintos en: {fields}"
+            f"{entity}: source={source!r} external_id={external_id!r} already exists with "
+            f"different data in: {fields}"
         )

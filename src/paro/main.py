@@ -1,8 +1,8 @@
-"""Punto de entrada de la API de PARO.
+"""PARO API entry point.
 
-Sprint 3 agrega los endpoints de dominio (``downtime-events``,
-``production-records``, ``oee``) sobre el esqueleto de Sprint 0. El chequeo
-de base de datos en ``/health`` sigue pendiente de un sprint posterior.
+Sprint 3 adds the domain endpoints (``downtime-events``,
+``production-records``, ``oee``) on top of Sprint 0's skeleton. The
+database check in ``/health`` is still pending a later sprint.
 """
 
 from typing import Any
@@ -18,7 +18,7 @@ from paro.api.routers.production import router as production_router
 app = FastAPI(
     title="PARO",
     version=__version__,
-    summary="Captura de paros de linea y calculo determinista de OEE.",
+    summary="Downtime capture and deterministic OEE calculation for a production line.",
 )
 
 app.include_router(downtime_router)

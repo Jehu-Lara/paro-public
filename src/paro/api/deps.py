@@ -1,4 +1,4 @@
-"""Dependencias de FastAPI compartidas entre routers."""
+"""FastAPI dependencies shared across routers."""
 
 from __future__ import annotations
 
@@ -12,13 +12,13 @@ __all__ = ["get_db"]
 
 
 def get_db() -> Generator[Session]:
-    """Abre una sesion por request y la cierra al final, pase lo que pase.
+    """Opens one session per request and closes it at the end, no matter what.
 
-    Sin commit propio: cada router es dueno de su unico ``commit()`` tras una
-    llamada exitosa al repositorio (ver ``paro.db.repositories``, que nunca
-    comitea). Si el repositorio lanza, el router deja propagar la excepcion
-    sin comitear ni hacer rollback manual; ``close()`` descarta el estado
-    pendiente de forma segura.
+    No commit of its own: each router owns its single ``commit()`` after a
+    successful repository call (see ``paro.db.repositories``, which never
+    commits). If the repository raises, the router lets the exception
+    propagate without committing or manually rolling back; ``close()``
+    safely discards the pending state.
     """
     db = get_session_local()()
     try:

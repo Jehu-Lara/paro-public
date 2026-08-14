@@ -1,17 +1,18 @@
-"""Router de ``GET /oee``.
+"""Router for ``GET /oee``.
 
-Adaptador puro: arma ``Interval``/``DowntimeSpan`` a partir de las filas de
-``downtime_event``/``production_record`` en la ventana pedida y llama a
-``paro.domain.oee.calculate_oee`` una sola vez. La formula de OEE no se
-reimplementa aqui.
+Pure adapter: builds ``Interval``/``DowntimeSpan`` from the
+``downtime_event``/``production_record`` rows in the requested window and
+calls ``paro.domain.oee.calculate_oee`` exactly once. The OEE formula is
+not reimplemented here.
 
-``shift.planned_break_minutes`` NO participa en este calculo: es un entero de
-minutos sin ``start``/``end`` asociado, y no hay forma de convertirlo en un
-``DowntimeSpan`` sin inventar cuando ocurre el descanso dentro del turno. El
-mecanismo real de tiempo planeado que ``calculate_oee`` consume es
-``downtime_event.is_planned`` (ver ``scripts/seed_demo.py``, que ya sigue
-este patron), asi que la ventana pedida por el cliente (``start``/``end``) es
-literalmente el ``window`` del dominio.
+``shift.planned_break_minutes`` does NOT participate in this calculation:
+it's an integer number of minutes with no associated ``start``/``end``,
+and there's no way to turn it into a ``DowntimeSpan`` without inventing
+when the break happens within the shift. The actual planned-time
+mechanism ``calculate_oee`` consumes is ``downtime_event.is_planned``
+(see ``scripts/seed_demo.py``, which already follows this pattern), so
+the window the client requests (``start``/``end``) is literally the
+domain's ``window``.
 """
 
 from __future__ import annotations
@@ -69,16 +70,16 @@ def get_oee(
     end: datetime = Query(...),  # noqa: B008
     db: Session = Depends(get_db),  # noqa: B008
 ) -> OEEResponse:
-    """Calcula OEE para ``line_id`` en la ventana ``[start, end)``.
+    """Calculates OEE for ``line_id`` in the ``[start, end)`` window.
 
-    404 si ``line_id`` no existe. Si existe pero no hay eventos en la
-    ventana, 200 con los componentes ``None`` y los warnings que
-    ``calculate_oee`` ya emite para denominadores en cero.
+    404 if ``line_id`` doesn't exist. If it exists but there are no events
+    in the window, 200 with ``None`` components and the warnings
+    ``calculate_oee`` already emits for zero denominators.
     """
     _require_aware(start, "start")
     _require_aware(end, "end")
     if end <= start:
-        raise HTTPException(status_code=422, detail="end debe ser mayor que start.")
+        raise HTTPException(status_code=422, detail="end must be greater than start.")
 
     if db.get(ProductionLine, line_id) is None:
         raise HTTPException(status_code=404, detail=f"production line {line_id} not found")

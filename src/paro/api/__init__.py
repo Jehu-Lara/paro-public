@@ -1,1 +1,1 @@
-"""Capa HTTP de PARO: routers, schemas Pydantic y manejo de errores."""
+"""PARO's HTTP layer: routers, Pydantic schemas, and error handling."""

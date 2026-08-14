@@ -306,7 +306,7 @@ def test_degenerate_span_with_end_before_or_equal_start_is_ignored_not_raised() 
 
 
 def test_negative_total_count_raises_value_error() -> None:
-    with pytest.raises(ValueError, match="no pueden ser negativos"):
+    with pytest.raises(ValueError, match="cannot be negative"):
         calculate_oee(
             window=WINDOW,
             planned_downtimes=[],
@@ -318,7 +318,7 @@ def test_negative_total_count_raises_value_error() -> None:
 
 
 def test_negative_good_count_raises_value_error() -> None:
-    with pytest.raises(ValueError, match="no pueden ser negativos"):
+    with pytest.raises(ValueError, match="cannot be negative"):
         calculate_oee(
             window=WINDOW,
             planned_downtimes=[],
@@ -330,7 +330,7 @@ def test_negative_good_count_raises_value_error() -> None:
 
 
 def test_good_count_greater_than_total_count_raises_value_error() -> None:
-    with pytest.raises(ValueError, match="no puede superar"):
+    with pytest.raises(ValueError, match="cannot exceed"):
         calculate_oee(
             window=WINDOW,
             planned_downtimes=[],

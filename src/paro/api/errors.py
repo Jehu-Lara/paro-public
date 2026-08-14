@@ -1,9 +1,9 @@
-"""Manejo de errores uniforme de la API.
+"""Uniform API error handling.
 
-``DuplicateWithDifferentPayloadError`` (409) y cualquier excepcion no
-controlada (500 generico, logueado con detalle en servidor) son los unicos
-casos especiales: la validacion de Pydantic ya produce 422 por defecto y no
-hace falta reinventarla.
+``DuplicateWithDifferentPayloadError`` (409) and any uncontrolled
+exception (generic 500, logged with detail server-side) are the only
+special cases: Pydantic validation already produces a 422 by default and
+there's no need to reinvent it.
 """
 
 from __future__ import annotations
@@ -24,11 +24,11 @@ logger = logging.getLogger(__name__)
 
 
 def _json_safe(value: Any) -> Any:
-    """Convierte un valor a algo serializable en JSON sin pasar por ``float``.
+    """Converts a value to something JSON-serializable without going through ``float``.
 
-    ``Decimal`` se serializa como string y ``datetime`` como ISO 8601: la
-    misma regla que las respuestas Pydantic, para que un 409 no pierda
-    precision ni deje pasar un naive por accidente.
+    ``Decimal`` is serialized as a string and ``datetime`` as ISO 8601: the
+    same rule Pydantic responses follow, so a 409 never loses precision or
+    lets a naive datetime slip through by accident.
     """
     if isinstance(value, Decimal):
         return str(value)
@@ -63,7 +63,7 @@ async def _generic_exception_handler(request: Request, exc: Exception) -> JSONRe
 
 
 def register_exception_handlers(app: FastAPI) -> None:
-    """Registra los handlers de errores en ``app``."""
+    """Registers the error handlers on ``app``."""
     app.add_exception_handler(
         DuplicateWithDifferentPayloadError, _duplicate_with_different_payload_handler
     )

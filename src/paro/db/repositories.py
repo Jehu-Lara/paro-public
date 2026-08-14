@@ -1,15 +1,16 @@
-"""Repositorios con idempotencia real por ``(source, external_id)``.
+"""Repositories with real idempotency by ``(source, external_id)``.
 
-Sigue el patron de "idempotent requests" de Stripe: la misma clave con el
-mismo payload devuelve la fila existente sin excepcion; la misma clave con un
-payload distinto lanza :class:`DuplicateWithDifferentPayloadError` en vez de
-duplicar la fila o dejar pasar el conflicto en silencio.
+Follows Stripe's "idempotent requests" pattern: the same key with the
+same payload returns the existing row without an exception; the same key
+with a different payload raises
+:class:`DuplicateWithDifferentPayloadError` instead of duplicating the
+row or silently letting the conflict through.
 
-La comparacion de payload cubre **todos** los campos de negocio del modelo
-(no solo un subconjunto): compararlos a medias haria que un cambio real en un
-campo no comparado se tratara como si fuera el mismo dato.
+The payload comparison covers **every** business field of the model (not
+just a subset): comparing only some of them would let a real change in an
+uncompared field be treated as if it were the same data.
 
-Sin logica de OEE aqui: estos repositorios solo persisten filas.
+No OEE logic here: these repositories only persist rows.
 """
 
 from __future__ import annotations
@@ -78,12 +79,12 @@ def create_downtime_event(
     source: str | None = None,
     external_id: str | None = None,
 ) -> tuple[DowntimeEvent, bool]:
-    """Inserta un evento de paro; devuelve ``(evento, was_created)``.
+    """Inserts a downtime event; returns ``(event, was_created)``.
 
-    Sin ``source`` y ``external_id`` no hay clave de idempotencia posible:
-    se inserta directo y ``was_created`` siempre es ``True``. Con ambos, un
-    choque de UNIQUE se resuelve comparando el payload de negocio completo
-    contra la fila existente.
+    Without ``source`` and ``external_id`` there's no possible idempotency
+    key: the row is inserted directly and ``was_created`` is always
+    ``True``. With both present, a UNIQUE clash is resolved by comparing
+    the full business payload against the existing row.
     """
     event = DowntimeEvent(
         line_id=line_id,
@@ -152,9 +153,9 @@ def create_production_record(
     source: str | None = None,
     external_id: str | None = None,
 ) -> tuple[ProductionRecord, bool]:
-    """Inserta un registro de produccion; devuelve ``(registro, was_created)``.
+    """Inserts a production record; returns ``(record, was_created)``.
 
-    Misma semantica de idempotencia que :func:`create_downtime_event`.
+    Same idempotency semantics as :func:`create_downtime_event`.
     """
     record = ProductionRecord(
         line_id=line_id,

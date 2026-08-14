@@ -1,1 +1,1 @@
-"""Capa de persistencia: modelos SQLAlchemy, sesion y tipos de columna."""
+"""Persistence layer: SQLAlchemy models, session, and column types."""

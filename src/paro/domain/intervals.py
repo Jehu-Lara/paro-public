@@ -1,16 +1,19 @@
-"""Algebra de intervalos de tiempo para el calculo de paros.
+"""Time-interval algebra for downtime calculation.
 
-Todos los intervalos son **medio-abiertos**: ``[start, end)``. Esa eleccion no es
-cosmetica; es lo que hace que dos turnos consecutivos (06:00-14:00 y 14:00-22:00)
-particionen el dia sin solapamiento ni hueco, y que un evento que termina justo
-cuando otro empieza no comparta ni un segundo con el.
+All intervals are **half-open**: ``[start, end)``. That choice isn't
+cosmetic; it's what makes two consecutive shifts (06:00-14:00 and
+14:00-22:00) partition the day without overlap or gap, and what makes an
+event that ends exactly when another starts share not even one second
+with it.
 
-Reglas del modulo:
+Module rules:
 
-* Todos los ``datetime`` deben ser *tz-aware*. Un ``datetime`` naive es un error
-  de programacion, no un valor por defecto: se rechaza con ``ValueError``.
-* Un intervalo vacio o invertido (``end <= start``) no existe: se rechaza.
-* Las operaciones son puras y deterministas. Ninguna funcion consulta el reloj.
+* Every ``datetime`` must be *tz-aware*. A naive ``datetime`` is a
+  programming error, not a default value: it's rejected with
+  ``ValueError``.
+* An empty or inverted interval (``end <= start``) doesn't exist: it's
+  rejected.
+* Operations are pure and deterministic. No function reads the clock.
 """
 
 from __future__ import annotations
@@ -30,21 +33,21 @@ __all__ = [
 
 
 def require_aware(moment: datetime, field: str) -> datetime:
-    """Valida que ``moment`` sea tz-aware y lo normaliza a UTC."""
+    """Validates that ``moment`` is tz-aware and normalizes it to UTC."""
     if moment.tzinfo is None or moment.tzinfo.utcoffset(moment) is None:
         raise ValueError(
-            f"{field} debe ser un datetime tz-aware; se recibio uno naive ({moment!r}). "
-            "PARO almacena y calcula siempre en UTC."
+            f"{field} must be tz-aware; received a naive datetime ({moment!r}). "
+            "PARO always stores and computes in UTC."
         )
     return moment.astimezone(UTC)
 
 
 @dataclass(frozen=True, slots=True, order=True)
 class Interval:
-    """Intervalo de tiempo medio-abierto ``[start, end)`` en UTC.
+    """Half-open time interval ``[start, end)`` in UTC.
 
-    Es inmutable y ordenable por ``start`` (y luego por ``end``), lo que permite
-    ordenar listas de intervalos sin escribir una clave de ordenamiento.
+    Immutable and orderable by ``start`` (and then by ``end``), which lets
+    lists of intervals be sorted without writing a sort key.
     """
 
     start: datetime
@@ -55,32 +58,32 @@ class Interval:
         end = require_aware(self.end, "end")
         if end <= start:
             raise ValueError(
-                f"Un intervalo requiere end > start; se recibio start={start.isoformat()} "
+                f"An interval requires end > start; received start={start.isoformat()} "
                 f"end={end.isoformat()}."
             )
-        # El dataclass es frozen: para normalizar a UTC hay que saltarse el setattr.
+        # The dataclass is frozen: normalizing to UTC requires bypassing setattr.
         object.__setattr__(self, "start", start)
         object.__setattr__(self, "end", end)
 
     @property
     def seconds(self) -> int:
-        """Duracion en segundos enteros.
+        """Duration in whole seconds.
 
-        Se usan segundos enteros (no ``float``) para que las sumas de duraciones
-        sean exactas y el calculo de OEE pueda hacerse con ``Decimal``.
+        Whole seconds (not ``float``) are used so duration sums are exact
+        and the OEE calculation can be done with ``Decimal``.
         """
         return int((self.end - self.start).total_seconds())
 
 
 def clip(interval: Interval, window: Interval) -> Interval | None:
-    """Recorta ``interval`` a ``window``.
+    """Clips ``interval`` to ``window``.
 
-    Devuelve ``None`` cuando no hay interseccion, en lugar de un intervalo vacio:
-    un intervalo de duracion cero no existe en este modelo, y devolver ``None``
-    obliga a quien llama a tratar el caso de forma explicita.
+    Returns ``None`` when there's no intersection, instead of a zero-length
+    interval: a zero-duration interval doesn't exist in this model, and
+    returning ``None`` forces the caller to handle the case explicitly.
 
-    Es la operacion que hace que un paro que cruza el limite de turno aporte a
-    cada turno solamente su porcion.
+    This is the operation that makes a downtime crossing a shift boundary
+    contribute only its portion to each shift.
     """
     start = max(interval.start, window.start)
     end = min(interval.end, window.end)
@@ -90,16 +93,17 @@ def clip(interval: Interval, window: Interval) -> Interval | None:
 
 
 def union(intervals: list[Interval]) -> list[Interval]:
-    """Fusiona intervalos solapados **y adyacentes** en una lista disjunta.
+    """Merges overlapping **and adjacent** intervals into a disjoint list.
 
-    Es la pieza que evita el doble conteo: si dos paros se solapan, los segundos
-    compartidos aparecen una sola vez en el resultado.
+    This is the piece that prevents double-counting: if two downtimes
+    overlap, the shared seconds appear only once in the result.
 
-    Los adyacentes se fusionan a proposito: dos paros consecutivos sin hueco
-    (14:00-14:05 y 14:05-14:10) son diez minutos de linea detenida de forma
-    continua, y contarlos como un solo tramo es lo correcto para disponibilidad.
+    Adjacent intervals are merged on purpose: two consecutive downtimes
+    with no gap (14:00-14:05 and 14:05-14:10) are ten continuous minutes
+    of the line being stopped, and counting them as a single stretch is
+    the correct thing for availability.
 
-    Devuelve una lista nueva ordenada por ``start``; no muta la entrada.
+    Returns a new list sorted by ``start``; does not mutate the input.
     """
     if not intervals:
         return []
@@ -110,18 +114,18 @@ def union(intervals: list[Interval]) -> list[Interval]:
             last = merged[-1]
             if current.end > last.end:
                 merged[-1] = Interval(last.start, current.end)
-            # Si current esta contenido en last, no aporta nada.
+            # If current is contained in last, it contributes nothing.
         else:
             merged.append(current)
     return merged
 
 
 def subtract(base: Interval, to_remove: list[Interval]) -> list[Interval]:
-    """Resta ``to_remove`` de ``base`` y devuelve los tramos que quedan.
+    """Subtracts ``to_remove`` from ``base`` and returns the remaining stretches.
 
-    Aplica ``union`` internamente, asi que acepta listas con solapamientos sin
-    restar dos veces los mismos segundos. Si ``to_remove`` cubre todo ``base``,
-    devuelve una lista vacia.
+    Applies ``union`` internally, so it accepts lists with overlaps
+    without subtracting the same seconds twice. If ``to_remove`` covers
+    all of ``base``, returns an empty list.
     """
     remaining: list[Interval] = []
     cursor = base.start
@@ -140,15 +144,15 @@ def subtract(base: Interval, to_remove: list[Interval]) -> list[Interval]:
 
 
 def duration_seconds(intervals: list[Interval]) -> int:
-    """Segundos cubiertos por ``intervals``, contando los solapes una sola vez."""
+    """Seconds covered by ``intervals``, counting overlaps only once."""
     return sum(item.seconds for item in union(intervals))
 
 
 def total_seconds(intervals: list[Interval]) -> int:
-    """Suma cruda de duraciones, **sin** deduplicar solapes.
+    """Raw sum of durations, **without** deduplicating overlaps.
 
-    Existe para poder medir cuanto tiempo se reasigno por solapamiento
-    (``total_seconds - duration_seconds``) y reportarlo como advertencia de
-    calidad de datos. No debe usarse para calcular disponibilidad.
+    Exists to measure how much time was reassigned due to overlap
+    (``total_seconds - duration_seconds``) and report it as a
+    data-quality warning. Must not be used to calculate availability.
     """
     return sum(item.seconds for item in intervals)

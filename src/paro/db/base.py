@@ -1,9 +1,9 @@
-"""Base declarativa de SQLAlchemy con convencion de nombres estable.
+"""SQLAlchemy declarative base with a stable naming convention.
 
-Sin ``naming_convention`` cada dialecto (y cada version de Alembic) puede
-generar nombres de constraint distintos para el mismo esquema logico, lo que
-rompe el autogenerate al comparar contra una migracion ya aplicada. Fijar la
-convencion aqui hace que los nombres sean identicos en SQLite y PostgreSQL.
+Without ``naming_convention``, each dialect (and each Alembic version) can
+generate different constraint names for the same logical schema, breaking
+autogenerate when comparing against an already-applied migration. Fixing
+the convention here makes the names identical on SQLite and PostgreSQL.
 """
 
 from __future__ import annotations
@@ -21,6 +21,6 @@ NAMING_CONVENTION = {
 
 
 class Base(DeclarativeBase):
-    """Clase base declarativa compartida por todos los modelos del dominio."""
+    """Declarative base class shared by every domain model."""
 
     metadata = MetaData(naming_convention=NAMING_CONVENTION)

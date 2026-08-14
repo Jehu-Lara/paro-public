@@ -1,9 +1,10 @@
-"""Modelos SQLAlchemy del esquema operacional.
+"""SQLAlchemy models for the operational schema.
 
-Portable entre SQLite y PostgreSQL a proposito: sin tipos ni ``server_default``
-especificos de un dialecto, para que migrar sea solo cambiar la cadena de
-conexion. ``rejected_count`` no se modela: es ``total_count - good_count``,
-derivado siempre en el dominio para tener una sola fuente de verdad.
+Portable between SQLite and PostgreSQL on purpose: no dialect-specific
+types or ``server_default``, so migrating is just a matter of changing
+the connection string. ``rejected_count`` isn't modeled: it's
+``total_count - good_count``, always derived in the domain to keep a
+single source of truth.
 """
 
 from __future__ import annotations
@@ -43,7 +44,7 @@ def _now_utc() -> datetime:
 
 
 class ProductionLine(Base):
-    """Una linea de produccion dentro de la planta."""
+    """A production line within the plant."""
 
     __tablename__ = "production_line"
 
@@ -55,7 +56,7 @@ class ProductionLine(Base):
 
 
 class Machine(Base):
-    """Una maquina/estacion dentro de una linea."""
+    """A machine/station within a line."""
 
     __tablename__ = "machine"
     __table_args__ = (UniqueConstraint("line_id", "code"),)
@@ -67,7 +68,7 @@ class Machine(Base):
 
 
 class DowntimeReason(Base):
-    """Catalogo de causas de paro, con jerarquia opcional (causa/subcausa)."""
+    """Catalog of downtime reasons, with optional hierarchy (cause/subcause)."""
 
     __tablename__ = "downtime_reason"
 
@@ -79,7 +80,7 @@ class DowntimeReason(Base):
 
 
 class Shift(Base):
-    """Instancia concreta de un turno (sin recurrencia, ver README/Limitaciones)."""
+    """Concrete instance of a shift (no recurrence, see README/Limitations)."""
 
     __tablename__ = "shift"
 
@@ -93,7 +94,7 @@ class Shift(Base):
 
 
 class DowntimeEvent(Base):
-    """Evento de paro. ``ended_at is None`` representa un evento todavia abierto."""
+    """A downtime event. ``ended_at is None`` represents an event still open."""
 
     __tablename__ = "downtime_event"
     __table_args__ = (
@@ -119,7 +120,7 @@ class DowntimeEvent(Base):
 
 
 class ProductionRecord(Base):
-    """Conteo de produccion en un intervalo de tiempo para una linea."""
+    """A production count over a time interval for a line."""
 
     __tablename__ = "production_record"
     __table_args__ = (
