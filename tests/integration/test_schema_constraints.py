@@ -140,6 +140,24 @@ def test_invalid_counts_rejected(
             session.commit()
 
 
+def test_negative_ideal_cycle_time_rejected(migrated_engine: Engine) -> None:
+    now = datetime.now(UTC)
+    with Session(migrated_engine) as session:
+        line = _make_line(session)
+        session.add(
+            ProductionRecord(
+                line_id=line.id,
+                interval_start=now,
+                interval_end=now + timedelta(hours=1),
+                total_count=10,
+                good_count=5,
+                ideal_cycle_time_seconds=Decimal("-1"),
+            )
+        )
+        with pytest.raises(IntegrityError):
+            session.commit()
+
+
 def test_invalid_foreign_key_rejected(migrated_engine: Engine) -> None:
     """Prueba directa de que ``PRAGMA foreign_keys=ON`` esta activo.
 

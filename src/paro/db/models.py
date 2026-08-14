@@ -125,6 +125,7 @@ class ProductionRecord(Base):
     __table_args__ = (
         CheckConstraint("interval_end > interval_start", name="valid_period"),
         CheckConstraint("good_count >= 0 AND good_count <= total_count", name="valid_counts"),
+        CheckConstraint("ideal_cycle_time_seconds >= 0", name="valid_ideal_cycle_time"),
         UniqueConstraint("source", "external_id"),
         Index("ix_production_record_line_id_interval_start", "line_id", "interval_start"),
     )
