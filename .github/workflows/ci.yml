@@ -1,0 +1,92 @@
+# CI de PARO.
+#
+# `quality` corre lint, tipos y la suite completa sobre SQLite (el pivote
+# temporal del ADR 0002). `integration-postgres` corre solo las pruebas de
+# integracion contra un PostgreSQL real de servicio: es el criterio de salida
+# del ADR 0002 y el que decide si lo que hoy afirmamos sobre constraints,
+# transacciones y tipos se sostiene fuera de SQLite. Ver ADR 0003.
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Set up Python 3.14
+        run: uv python install 3.14
+
+      - name: Install dependencies
+        run: uv sync --extra dev --frozen
+
+      - name: Ruff (lint)
+        run: uv run ruff check src tests
+
+      - name: Ruff (format)
+        run: uv run ruff format --check src tests
+
+      - name: Mypy
+        run: uv run mypy src
+
+      - name: Pytest
+        run: uv run pytest -v
+
+  integration-postgres:
+    runs-on: ubuntu-latest
+    # El riesgo de rendimiento (downgrade+upgrade por prueba) esta anotado como
+    # no bloqueante en ADR 0003; este limite solo evita un job colgado.
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16
+        # Credenciales fijas a proposito: este servicio es efimero, vive solo
+        # dentro del job y no es alcanzable desde fuera. No son secretos y no
+        # deben moverse a `secrets`.
+        env:
+          POSTGRES_USER: paro
+          POSTGRES_PASSWORD: paro
+          POSTGRES_DB: paro_test
+        ports:
+          - 5432:5432
+        # Sin el health-check el job arranca antes de que Postgres acepte
+        # conexiones y `alembic` falla de forma intermitente.
+        options: >-
+          --health-cmd "pg_isready -U paro -d paro_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # `+psycopg` es obligatorio: SQLAlchemy resuelve `postgresql://` a
+      # psycopg2, que no esta instalado (pyproject trae psycopg 3).
+      PARO_TEST_POSTGRES_URL: postgresql+psycopg://paro:paro@localhost:5432/paro_test
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Set up Python 3.14
+        run: uv python install 3.14
+
+      - name: Install dependencies
+        run: uv sync --extra dev --frozen
+
+      # Solo `tests/integration`: es la unica suite que usa `migrated_engine`.
+      # Las unitarias son dominio puro y ya corren en `quality`.
+      - name: Pytest (integracion sobre PostgreSQL)
+        run: uv run pytest tests/integration -v
