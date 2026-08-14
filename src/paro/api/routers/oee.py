@@ -129,5 +129,5 @@ def get_oee(
         oee=result.oee,
         planned_production_time_seconds=result.planned_production_time_seconds,
         run_time_seconds=result.run_time_seconds,
-        warnings=list(result.warnings),  # type: ignore[arg-type]
+        warnings=list(result.warnings),
     )

@@ -59,7 +59,7 @@ class OeeResult:
     oee: Decimal | None
     planned_production_time_seconds: int
     run_time_seconds: int
-    warnings: list[str] = field(default_factory=list)
+    warnings: list[Warning] = field(default_factory=list)
 
 
 def _resolve_span(span: DowntimeSpan, as_of: datetime) -> Interval | None:
@@ -180,5 +180,5 @@ def calculate_oee(
         oee=oee,
         planned_production_time_seconds=planned_production_time_seconds,
         run_time_seconds=run_time_seconds,
-        warnings=[str(w) for w in warnings_found],
+        warnings=warnings_found,
     )
