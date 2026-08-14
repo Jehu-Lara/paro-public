@@ -15,7 +15,7 @@ class Settings(BaseSettings):
 
     ``database_url`` defaults to a local SQLite file (``./paro.db``). This
     is a temporary pivot documented in
-    ``docs/adr/0002-sqlite-temporal-por-bloqueo-de-virtualizacion.md``: the
+    ``docs/adr/0002-sqlite-temporary-due-to-virtualization-block.md``: the
     target is still PostgreSQL, and switching back is just a matter of
     changing this connection string.
     """

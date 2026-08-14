@@ -6,7 +6,7 @@
 
 ## Context
 
-[ADR 0002](0002-sqlite-temporal-por-bloqueo-de-virtualizacion.md) temporarily
+[ADR 0002](0002-sqlite-temporary-due-to-virtualization-block.md) temporarily
 pivoted to SQLite for the schema/migrations/repositories (Sprint 2) and set
 an explicit exit criterion: `tests/integration/` must run again, without
 modifying the CHECK/UNIQUE/FK constraints it verifies, against real

@@ -8,6 +8,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Renamed the two Spanish-named ADR files to English filenames -
+  `docs/adr/0002-sqlite-temporal-por-bloqueo-de-virtualizacion.md` ->
+  `docs/adr/0002-sqlite-temporary-due-to-virtualization-block.md`, and
+  `docs/adr/0003-ci-postgres-service-sin-docker-local.md` ->
+  `docs/adr/0003-ci-postgres-service-without-local-docker.md` - literal
+  translations, same structure as the originals; `0001-python-314.md` was
+  already English. Both files' content, status, and dates are untouched;
+  only the filename changed (`git mv`, so history is preserved). Updated
+  the 7 cross-references found via `git grep` (`.env.example`, `README.md`
+  x3, ADR 0003's own self-link to ADR 0002, `docs/analytics.md`, and a
+  docstring in `src/paro/config.py`) - confirmed zero remaining stale
+  references with the same `git grep` command used to find them. This was
+  the one remnant deliberately left open by the earlier Spanish-to-English
+  translation pass (which was scoped to `src/` only).
+
 - `mypy` and `ruff` (check + format) now cover `alembic/` and `tests/` in
   CI, not just `src/` (`pyproject.toml`'s `[tool.ruff] src` and
   `[tool.mypy] files`, plus the three commands in

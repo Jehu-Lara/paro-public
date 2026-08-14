@@ -4,7 +4,7 @@
 `alembic/versions/0002_analytics_views.py`).** This document describes the
 two enriched SQL fact views the README promises (`## MVP scope`), delivered
 once the CI job against real PostgreSQL went green (see
-[ADR 0003](adr/0003-ci-postgres-service-sin-docker-local.md)).
+[ADR 0003](adr/0003-ci-postgres-service-without-local-docker.md)).
 
 ## Non-negotiable design rule
 

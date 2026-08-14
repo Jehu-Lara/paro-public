@@ -15,8 +15,8 @@ analytics schema connectable to Power BI.
 > development environment doesn't have local Docker available). PostgreSQL
 > is validated in CI via a `postgres:16` service in GitHub Actions, not local
 > Docker; see
-> [ADR 0002](docs/adr/0002-sqlite-temporal-por-bloqueo-de-virtualizacion.md) and
-> [ADR 0003](docs/adr/0003-ci-postgres-service-sin-docker-local.md).
+> [ADR 0002](docs/adr/0002-sqlite-temporary-due-to-virtualization-block.md) and
+> [ADR 0003](docs/adr/0003-ci-postgres-service-without-local-docker.md).
 
 ---
 
@@ -52,7 +52,7 @@ PARO **is not a dashboard**. It's the service underneath one:
 - Two enriched SQL fact views for Power BI.
 - Deterministic synthetic data with edge cases.
 - Unit tests (domain) and integration tests. Target: real PostgreSQL, never SQLite;
-  temporary exception documented in [ADR 0002](docs/adr/0002-sqlite-temporal-por-bloqueo-de-virtualizacion.md).
+  temporary exception documented in [ADR 0002](docs/adr/0002-sqlite-temporary-due-to-virtualization-block.md).
 
 ## Out of MVP scope
 
