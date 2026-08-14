@@ -13,11 +13,16 @@ from decimal import Decimal
 
 import pytest
 from sqlalchemy import Engine, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from paro.db.exceptions import DuplicateWithDifferentPayloadError
 from paro.db.models import DowntimeEvent, DowntimeReason, ProductionLine, ProductionRecord
-from paro.db.repositories import create_downtime_event, create_production_record
+from paro.db.repositories import (
+    _is_unique_violation,
+    create_downtime_event,
+    create_production_record,
+)
 
 NOW = datetime(2026, 8, 10, 22, 0, tzinfo=UTC)
 
@@ -201,3 +206,58 @@ def test_create_production_record_different_payload_raises(migrated_engine: Engi
         assert "good_count" in exc_info.value.differing_fields
         assert _count(session, ProductionRecord) == 1
         session.commit()
+
+
+def test_is_unique_violation_does_not_cross_attribute_between_tables(
+    migrated_engine: Engine,
+) -> None:
+    """Reproduces the exact gap ``column_names`` alone allowed: a
+    ``production_record`` UNIQUE violation must not be misidentified as a
+    ``downtime_event`` one just because both tables share column names.
+    """
+    with Session(migrated_engine) as session:
+        line = _make_line(session)
+        session.add(
+            ProductionRecord(
+                line_id=line.id,
+                interval_start=NOW,
+                interval_end=NOW + timedelta(hours=1),
+                total_count=10,
+                good_count=10,
+                ideal_cycle_time_seconds=Decimal("1.0"),
+                source="mes",
+                external_id="shared-key",
+            )
+        )
+        session.commit()
+
+        session.add(
+            ProductionRecord(
+                line_id=line.id,
+                interval_start=NOW + timedelta(hours=2),
+                interval_end=NOW + timedelta(hours=3),
+                total_count=10,
+                good_count=10,
+                ideal_cycle_time_seconds=Decimal("1.0"),
+                source="mes",
+                external_id="shared-key",
+            )
+        )
+        with pytest.raises(IntegrityError) as exc_info:
+            session.commit()
+        session.rollback()
+
+        violation = exc_info.value
+
+    assert _is_unique_violation(
+        violation,
+        constraint_name="uq_production_record_source",
+        column_names=("source", "external_id"),
+        table_name="production_record",
+    )
+    assert not _is_unique_violation(
+        violation,
+        constraint_name="uq_downtime_event_source",
+        column_names=("source", "external_id"),
+        table_name="downtime_event",
+    )

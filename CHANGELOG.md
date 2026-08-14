@@ -35,3 +35,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   container, see ADR 0003) - local development runs on SQLite. Removed the
   "Docker Desktop" bullet from Requirements and "Docker" from the Sprint 4
   roadmap line, both of which overstated what's actually provided.
+- `db/repositories.py::_is_unique_violation`'s SQLite fallback matched a
+  UNIQUE violation by column names alone (`"source" in message`), and
+  `downtime_event`/`production_record` share the same column names. A
+  `production_record` violation could in theory be misattributed to
+  `downtime_event` (or vice versa) if the wrong table's error text happened
+  to satisfy the check. Verified empirically that SQLite's UNIQUE violation
+  text never includes the constraint name (only `table.column`, unlike
+  PostgreSQL's, which does and was already anchored correctly) - added a
+  required `table_name` parameter and qualified each column check with it
+  (`f"{table_name}.{name}"`).

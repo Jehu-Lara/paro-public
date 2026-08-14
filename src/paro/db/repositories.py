@@ -29,25 +29,36 @@ __all__ = ["create_downtime_event", "create_production_record"]
 
 
 def _is_unique_violation(
-    exc: IntegrityError, *, constraint_name: str, column_names: tuple[str, ...]
+    exc: IntegrityError, *, constraint_name: str, column_names: tuple[str, ...], table_name: str
 ) -> bool:
-    """``True`` si ``exc`` es la violacion UNIQUE de ``constraint_name``.
+    """``True`` if ``exc`` is the UNIQUE violation for ``constraint_name``.
 
-    Evita que un ``except IntegrityError`` generico se trague otro tipo de
-    violacion de integridad (un CHECK o una FK) y lo confunda con un
-    duplicado de clave de idempotencia. El texto del error es especifico de
-    cada driver -- psycopg (PostgreSQL) y sqlite3 no usan el mismo formato,
-    ver ejemplos abajo -- asi que se reconocen ambos en vez de asumir uno
-    solo. ``constraint_name`` es estable entre dialectos porque
-    ``paro.db.base.NAMING_CONVENTION`` lo fija en la definicion del modelo.
+    Keeps a generic ``except IntegrityError`` from swallowing a different
+    integrity violation (a CHECK or an FK) and mistaking it for a duplicate
+    idempotency key. The error text is driver-specific -- psycopg
+    (PostgreSQL) and sqlite3 don't share a format, see the examples below --
+    so both are recognized instead of assuming one.
 
-    PostgreSQL/psycopg: ``...unique constraint "uq_downtime_event_source"``
-    SQLite: ``UNIQUE constraint failed: downtime_event.source, downtime_event.external_id``
+    PostgreSQL/psycopg: anchored to ``constraint_name``, which is stable
+    across dialects via ``paro.db.base.NAMING_CONVENTION`` -- unambiguous by
+    itself, no ``table_name`` needed: ``...unique constraint
+    "uq_downtime_event_source"``.
+
+    SQLite: the driver never includes the constraint name in a UNIQUE
+    violation (verified empirically -- unlike its CHECK violations, which do
+    name the constraint), only ``table.column``: ``UNIQUE constraint
+    failed: downtime_event.source, downtime_event.external_id``. Without
+    also requiring ``table_name``, ``downtime_event`` and
+    ``production_record`` share the same ``column_names`` ("source",
+    "external_id"), so a violation on one table could be misattributed to
+    the other.
     """
     message = str(exc.orig)
     if f'"{constraint_name}"' in message:
         return True
-    return "UNIQUE constraint failed" in message and all(name in message for name in column_names)
+    return "UNIQUE constraint failed" in message and all(
+        f"{table_name}.{name}" in message for name in column_names
+    )
 
 
 def _differing_fields(pairs: dict[str, tuple[Any, Any]]) -> dict[str, tuple[Any, Any]]:
@@ -96,7 +107,10 @@ def create_downtime_event(
             session.flush()
     except IntegrityError as exc:
         if not _is_unique_violation(
-            exc, constraint_name="uq_downtime_event_source", column_names=("source", "external_id")
+            exc,
+            constraint_name="uq_downtime_event_source",
+            column_names=("source", "external_id"),
+            table_name="downtime_event",
         ):
             raise
         existing = session.execute(
@@ -166,6 +180,7 @@ def create_production_record(
             exc,
             constraint_name="uq_production_record_source",
             column_names=("source", "external_id"),
+            table_name="production_record",
         ):
             raise
         existing = session.execute(
