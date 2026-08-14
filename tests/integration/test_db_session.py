@@ -41,10 +41,12 @@ def test_get_engine_is_lazy_and_cached() -> None:
         fresh = _load_fresh_copy()
         mock_create_engine.assert_not_called()  # import alone builds nothing
 
-        first = fresh.get_engine()
+        # _load_fresh_copy() returns object on purpose (see its docstring):
+        # mypy can't know the dynamically loaded module's shape statically.
+        first = fresh.get_engine()  # type: ignore[attr-defined]
         mock_create_engine.assert_called_once()
 
-        second = fresh.get_engine()
+        second = fresh.get_engine()  # type: ignore[attr-defined]
         assert second is first
         mock_create_engine.assert_called_once()  # still once: cached, not rebuilt
 

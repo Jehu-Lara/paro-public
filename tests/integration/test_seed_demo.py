@@ -53,4 +53,5 @@ def test_seed_contains_two_overlapping_downtime_events(migrated_engine: Engine) 
 
     assert len(events) == 2
     first, second = sorted(events, key=lambda event: event.started_at)
+    assert first.ended_at is not None
     assert second.started_at < first.ended_at  # se solapan de verdad

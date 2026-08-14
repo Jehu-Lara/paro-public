@@ -71,7 +71,8 @@ def test_create_downtime_event_same_payload_is_noop(migrated_engine: Engine) -> 
     with Session(migrated_engine) as session:
         line = _make_line(session)
         reason = _make_reason(session)
-        kwargs = dict(
+        first, first_created = create_downtime_event(
+            session,
             line_id=line.id,
             reason_id=reason.id,
             started_at=NOW,
@@ -80,10 +81,17 @@ def test_create_downtime_event_same_payload_is_noop(migrated_engine: Engine) -> 
             source="mes",
             external_id="evt-1",
         )
-
-        first, first_created = create_downtime_event(session, **kwargs)
         session.commit()
-        second, second_created = create_downtime_event(session, **kwargs)
+        second, second_created = create_downtime_event(
+            session,
+            line_id=line.id,
+            reason_id=reason.id,
+            started_at=NOW,
+            ended_at=NOW + timedelta(minutes=5),
+            is_planned=False,
+            source="mes",
+            external_id="evt-1",
+        )
         session.commit()
 
         assert first_created is True
@@ -152,7 +160,8 @@ def test_create_production_record_new_is_created(migrated_engine: Engine) -> Non
 def test_create_production_record_same_payload_is_noop(migrated_engine: Engine) -> None:
     with Session(migrated_engine) as session:
         line = _make_line(session)
-        kwargs = dict(
+        first, first_created = create_production_record(
+            session,
             line_id=line.id,
             interval_start=NOW,
             interval_end=NOW + timedelta(hours=1),
@@ -162,10 +171,18 @@ def test_create_production_record_same_payload_is_noop(migrated_engine: Engine) 
             source="mes",
             external_id="rec-1",
         )
-
-        first, first_created = create_production_record(session, **kwargs)
         session.commit()
-        second, second_created = create_production_record(session, **kwargs)
+        second, second_created = create_production_record(
+            session,
+            line_id=line.id,
+            interval_start=NOW,
+            interval_end=NOW + timedelta(hours=1),
+            total_count=100,
+            good_count=95,
+            ideal_cycle_time_seconds=Decimal("12.5"),
+            source="mes",
+            external_id="rec-1",
+        )
         session.commit()
 
         assert first_created is True

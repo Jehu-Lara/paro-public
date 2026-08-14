@@ -161,19 +161,29 @@ def run(session: Session) -> dict[str, int]:
     )
     _get_or_create_shift(session, line)
 
-    planned_kwargs = {
-        "line_id": line.id,
-        "machine_id": machine_1.id,
-        "reason_id": reason_planned.id,
-        "started_at": PLANNED_EVENT_START,
-        "ended_at": PLANNED_EVENT_END,
-        "is_planned": True,
-        "source": SOURCE,
-        "external_id": "downtime-planned-1",
-    }
-    _, was_created_first = create_downtime_event(session, **planned_kwargs)
+    _, was_created_first = create_downtime_event(
+        session,
+        line_id=line.id,
+        machine_id=machine_1.id,
+        reason_id=reason_planned.id,
+        started_at=PLANNED_EVENT_START,
+        ended_at=PLANNED_EVENT_END,
+        is_planned=True,
+        source=SOURCE,
+        external_id="downtime-planned-1",
+    )
     print(f"[seed_demo] downtime-planned-1: 1ra llamada was_created={was_created_first}")
-    _, was_created_second = create_downtime_event(session, **planned_kwargs)
+    _, was_created_second = create_downtime_event(
+        session,
+        line_id=line.id,
+        machine_id=machine_1.id,
+        reason_id=reason_planned.id,
+        started_at=PLANNED_EVENT_START,
+        ended_at=PLANNED_EVENT_END,
+        is_planned=True,
+        source=SOURCE,
+        external_id="downtime-planned-1",
+    )
     print(
         f"[seed_demo] downtime-planned-1: 2da llamada (mismo payload) "
         f"was_created={was_created_second} (idempotencia demostrada)"
