@@ -8,6 +8,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Closed the two loose ends flagged during earlier tasks: `pyproject.toml`'s
+  `description` was still in Spanish (missed by the `src/`-only Spanish-
+  to-English translation pass since it's project metadata, not a `.py`
+  file) - now reuses the phrasing already established in
+  `src/paro/__init__.py` and `main.py`'s FastAPI `summary`, instead of
+  new wording. `docs/analytics.md`'s note on why per-window `Quality`
+  can't live in a SQL view referred to the partial-overlap production-
+  record exclusion as a bare, unsignaled invariant - stale since Backlog
+  #2/Option A added the `PARTIAL_PRODUCTION_EXCLUDED` warning for exactly
+  that case; the sentence now points at it.
+
 - Renamed the two Spanish-named ADR files to English filenames -
   `docs/adr/0002-sqlite-temporal-por-bloqueo-de-virtualizacion.md` ->
   `docs/adr/0002-sqlite-temporary-due-to-virtualization-block.md`, and

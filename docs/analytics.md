@@ -68,8 +68,10 @@ view's grain is one row per `production_record`, and none of the three
 components can be computed at that grain. `Quality` in `GET /api/v1/oee`
 ([oee.py](../src/paro/api/routers/oee.py)) is a **per-window
 aggregation** — it sums `total_count`/`good_count` only across records
-fully contained in `[start, end)` (the invariant already fixed in S3, which
-excludes partially overlapping records) — not the value of a single row.
+fully contained in `[start, end)`; a partially overlapping record is
+excluded whole and flagged with the `PARTIAL_PRODUCTION_EXCLUDED` warning
+(see `docs/oee-definition.md`) rather than silently dropped — not the
+value of a single row.
 `Availability`/`Performance` also require the planned/unplanned downtimes
 for that same window, clipped and combined (`union`/`subtract` in
 `domain/intervals.py`), which likewise don't exist at the level of a single

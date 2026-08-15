@@ -2,7 +2,7 @@
 name = "paro"
 # Fuente unica de verdad de la version: src/paro/__init__.py
 dynamic = ["version"]
-description = "Plataforma de datos operacionales para manufactura: captura de paros de linea y calculo determinista de OEE."
+description = "Operational data platform for manufacturing: downtime capture and deterministic OEE calculation for a production line."
 readme = "README.md"
 requires-python = ">=3.14"
 license = { text = "MIT" }
