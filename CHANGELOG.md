@@ -6,6 +6,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- `db/session.py`'s `get_engine()` didn't pass `pool_pre_ping` to
+  `create_engine()`, so a connection already checked into the pool could go
+  stale while the process itself stayed alive - a real risk against managed
+  Postgres providers that autosuspend an idle database on a fixed timer (e.g.
+  Neon's free tier, 5 minutes), where the next checkout would fail mid-request
+  instead of being caught before use. Added `pool_pre_ping=True`: SQLAlchemy
+  pings each pooled connection before handing it out and transparently
+  reconnects if the ping fails.
+
 ### Changed
 
 - Closed the two loose ends flagged during earlier tasks: `pyproject.toml`'s

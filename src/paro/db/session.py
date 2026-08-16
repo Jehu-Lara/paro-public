@@ -39,8 +39,13 @@ def get_engine() -> Engine:
     being ready, and meant swapping the connection string always required
     reaching into a module-level object instead of a documented entry
     point. Same singleton behavior as before, just deferred to first call.
+
+    ``pool_pre_ping`` pings each pooled connection before reuse: managed
+    Postgres providers (e.g. Neon's free tier) autosuspend the database
+    after a period of inactivity, which can leave a pooled connection
+    stale while this process stays alive.
     """
-    engine = create_engine(get_settings().database_url)
+    engine = create_engine(get_settings().database_url, pool_pre_ping=True)
     _register_sqlite_foreign_keys(engine)
     return engine
 
