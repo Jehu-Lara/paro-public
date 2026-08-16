@@ -20,6 +20,18 @@ analytics schema connectable to Power BI.
 
 ---
 
+## Live demo
+
+<!-- TODO: replace with the actual Render URL once the service is created. -->
+API: <https://paro-api.onrender.com> · docs: <https://paro-api.onrender.com/docs>
+
+> Runs on Render's free tier, which spins down after 15 minutes without
+> traffic; the first request after idling can take ~30-60s to respond
+> while the instance wakes up. There is no authentication on this demo —
+> don't send anything sensitive to it, all data is synthetic.
+
+---
+
 ## Problem
 
 At many plants, machine downtime is logged in Excel **after** the shift. Micro-stops

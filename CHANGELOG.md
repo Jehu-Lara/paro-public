@@ -30,6 +30,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   decorator to read the caller's IP. `GET` endpoints, including
   `GET /api/v1/oee`, are deliberately left unlimited - read-only over
   synthetic data, nothing to protect.
+- `README.md`: new "Live demo" section (after Status, before Problem) linking
+  to the hosted instance, with an explicit cold-start warning (Render's free
+  tier suspends after 15 minutes idle; the first request after that can take
+  ~30-60s to respond) and a reminder that the demo has no real authentication
+  and shouldn't receive sensitive data. The URL itself is a placeholder
+  pending the Render Web Service actually being created.
 
 ### Fixed
 
