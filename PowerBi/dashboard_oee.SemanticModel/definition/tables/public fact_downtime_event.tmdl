@@ -5,6 +5,12 @@ table 'public fact_downtime_event'
 		formatString: 0
 		lineageTag: 5940a97a-49bb-4943-9f2c-2ebb57ab964b
 
+	measure Total_Eventos_Paro = COUNTROWS('public fact_downtime_event')
+		formatString: 0
+
+	measure Total_Horas_Paro = DIVIDE([Total_Segundos_Paro], 3600)
+		formatString: 0.00
+
 	measure %_Pareto_Acumulado = ```
 			
 			VAR Total_Global = CALCULATE([Total_Segundos_Paro], ALL('public fact_downtime_event'[reason_name]))
