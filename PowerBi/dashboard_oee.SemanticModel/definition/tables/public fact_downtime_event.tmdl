@@ -5,12 +5,6 @@ table 'public fact_downtime_event'
 		formatString: 0
 		lineageTag: 5940a97a-49bb-4943-9f2c-2ebb57ab964b
 
-	measure Total_Eventos_Paro = COUNTROWS('public fact_downtime_event')
-		formatString: 0
-
-	measure Total_Horas_Paro = DIVIDE([Total_Segundos_Paro], 3600)
-		formatString: 0.00
-
 	measure %_Pareto_Acumulado = ```
 			
 			VAR Total_Global = CALCULATE([Total_Segundos_Paro], ALL('public fact_downtime_event'[reason_name]))
@@ -28,6 +22,14 @@ table 'public fact_downtime_event'
 			```
 		formatString: 0.00%;-0.00%;0.00%
 		lineageTag: e69ec2f2-5b9b-445f-86c0-fe612c7448a6
+
+	measure Total_Eventos_Paro = COUNTROWS('public fact_downtime_event')
+		formatString: 0
+		lineageTag: e165a8e1-fe6c-46d8-9d3d-9de9ab0727a4
+
+	measure Total_Horas_Paro = DIVIDE([Total_Segundos_Paro], 3600)
+		formatString: 0.00
+		lineageTag: 2865b1d4-e7f3-4912-abbb-f0cb5687581a
 
 	column downtime_event_id
 		dataType: int64

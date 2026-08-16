@@ -88,6 +88,32 @@
         "isDefaultSort": true
       }
     },
+    "objects": {
+      "dataPoint": [
+        {
+          "properties": {
+            "showAllDataPoints": {
+              "expr": {
+                "Literal": {
+                  "Value": "false"
+                }
+              }
+            },
+            "fill": {
+              "solid": {
+                "color": {
+                  "expr": {
+                    "Literal": {
+                      "Value": "'#5B7C99'"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
     "drillFilterOtherVisuals": true
   },
   "filterConfig": {
@@ -163,34 +189,6 @@
             }
           ]
         }
-      },
-      {
-        "name": "862c3ea41132cd68d300",
-        "field": {
-          "Measure": {
-            "Expression": {
-              "SourceRef": {
-                "Entity": "public fact_downtime_event"
-              }
-            },
-            "Property": "Total_Segundos_Paro"
-          }
-        },
-        "type": "Advanced"
-      },
-      {
-        "name": "89ecdaa52f63930efdce",
-        "field": {
-          "Measure": {
-            "Expression": {
-              "SourceRef": {
-                "Entity": "public fact_downtime_event"
-              }
-            },
-            "Property": "%_Pareto_Acumulado"
-          }
-        },
-        "type": "Advanced"
       }
     ]
   }

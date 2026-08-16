@@ -3,12 +3,15 @@ table 'public production_record'
 
 	measure Total_Unidades_Producidas = SUM('public production_record'[total_count])
 		formatString: 0
+		lineageTag: a2f3ace1-198a-4ccb-9722-891ac1529008
 
 	measure Total_Unidades_Buenas = SUM('public production_record'[good_count])
 		formatString: 0
+		lineageTag: c46cab83-26c6-4adb-a336-05e54113285d
 
 	measure Total_Unidades_Rechazadas = [Total_Unidades_Producidas] - [Total_Unidades_Buenas]
 		formatString: 0
+		lineageTag: 63894b4a-95f9-412f-9f73-b80ea32e5770
 
 	column id
 		dataType: int64
