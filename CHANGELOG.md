@@ -8,6 +8,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- CORS, GET-only: `main.py` registers `CORSMiddleware` with
+  `allow_origins=["*"]`, `allow_methods=["GET"]`. Both `POST` write
+  endpoints (and the new `PATCH`, see below) take a JSON body, which is
+  never a CORS "simple request" - a cross-origin browser call always sends
+  an `OPTIONS` preflight first, and restricting `allow_methods` to `GET`
+  makes that preflight fail, so the browser never sends the actual write
+  request. Non-browser callers (curl, Power BI, server-to-server) are
+  unaffected - CORS is a browser-only restriction, and rate limiting on the
+  writes is unchanged. `tests/unit/test_cors.py` asserts the mechanism
+  itself (preflight `Access-Control-Allow-Methods` excludes `POST`), not
+  just that the middleware is registered. No new `Settings`/env var - every
+  origin is allowed for reads, nothing to configure per-environment.
 - `GET /health` now reports two independent signals instead of only process
   liveness: the existing `status`/`version` fields (unconditionally 200,
   unchanged), plus a new `database: "ok" | "unreachable"` field from a

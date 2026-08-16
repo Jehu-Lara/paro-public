@@ -7,6 +7,7 @@ Sprint 3 adds the domain endpoints (``downtime-events``,
 from typing import Any
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -27,6 +28,7 @@ app = FastAPI(
     summary="Downtime capture and deterministic OEE calculation for a production line.",
 )
 
+
 def _handle_rate_limit_exceeded(request: Request, exc: Exception) -> Response:
     assert isinstance(exc, RateLimitExceeded)
     return _rate_limit_exceeded_handler(request, exc)
@@ -34,6 +36,21 @@ def _handle_rate_limit_exceeded(request: Request, exc: Exception) -> Response:
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _handle_rate_limit_exceeded)
+
+# GET-only: a cross-origin browser call to either POST endpoint always
+# sends a JSON body, which is never a CORS "simple request" and therefore
+# always triggers a preflight OPTIONS first. Restricting allow_methods to
+# GET makes that preflight fail, so the browser never sends the actual
+# POST -- without this having to touch the routers or the rate limiter.
+# Non-browser callers (curl, Power BI, server-to-server) are unaffected:
+# CORS is a browser-only restriction.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["GET"],
+    allow_headers=["*"],
+    allow_credentials=False,
+)
 
 app.include_router(downtime_router)
 app.include_router(production_router)
