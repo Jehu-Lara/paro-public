@@ -22,8 +22,7 @@ analytics schema connectable to Power BI.
 
 ## Live demo
 
-<!-- TODO: replace with the actual Render URL once the service is created. -->
-API: <https://paro-api.onrender.com> · docs: <https://paro-api.onrender.com/docs>
+API: <https://paro-public.onrender.com> · docs: <https://paro-public.onrender.com/docs>
 
 > Runs on Render's free tier, which spins down after 15 minutes without
 > traffic; the first request after idling can take ~30-60s to respond
