@@ -16,6 +16,7 @@ dependencies = [
     "sqlalchemy>=2.0.51",       # ORM sincrono tipado (wheels cp314 desde 2.0.51)
     "psycopg[binary]>=3.3.4",   # driver PostgreSQL 3 (soporte 3.14 desde 3.3.4)
     "alembic>=1.17",            # migraciones versionadas
+    "slowapi>=0.1.10",          # rate limiting en memoria para los endpoints de escritura
 ]
 
 [project.optional-dependencies]

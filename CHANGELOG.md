@@ -6,6 +6,31 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- `GET /health` now reports two independent signals instead of only process
+  liveness: the existing `status`/`version` fields (unconditionally 200,
+  unchanged), plus a new `database: "ok" | "unreachable"` field from a
+  `SELECT 1` wrapped in a `try`/`except SQLAlchemyError` - a database outage
+  is now visible in the response body without ever turning the endpoint
+  itself into a 500. Removed the docstring line claiming the DB check was
+  "pending a later sprint" - no longer true. `tests/unit/test_health.py`
+  updated to assert the new field.
+- `POST /api/v1/downtime-events` and `POST /api/v1/production-records` are
+  now rate-limited to 30 requests/minute per client IP (`slowapi`, new
+  runtime dependency, in-memory backend - adequate for the single free-tier
+  instance this runs on today; would need a shared backend such as Redis if
+  this ever scales past one instance). New `api/rate_limit.py` holds the
+  shared `Limiter` (`key_func=get_remote_address`); `main.py` registers it on
+  `app.state.limiter` plus a `RateLimitExceeded` exception handler (wrapped
+  in a thin function matching the exact signature
+  `Starlette.add_exception_handler` expects, since `slowapi`'s own handler
+  doesn't type-check against it under `mypy --strict`). Both routers gained a
+  `request: Request` parameter, required by the `@limiter.limit(...)`
+  decorator to read the caller's IP. `GET` endpoints, including
+  `GET /api/v1/oee`, are deliberately left unlimited - read-only over
+  synthetic data, nothing to protect.
+
 ### Fixed
 
 - `db/session.py`'s `get_engine()` didn't pass `pool_pre_ping` to

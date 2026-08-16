@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
 from paro.api.deps import get_db
+from paro.api.rate_limit import limiter
 from paro.api.schemas.downtime import DowntimeEventCreate, DowntimeEventResponse
 from paro.db.models import DowntimeReason, Machine, ProductionLine
 from paro.db.repositories import create_downtime_event
@@ -16,7 +17,9 @@ router = APIRouter(prefix="/api/v1", tags=["downtime-events"])
 
 
 @router.post("/downtime-events", response_model=DowntimeEventResponse)
+@limiter.limit("30/minute")
 def post_downtime_event(
+    request: Request,
     payload: DowntimeEventCreate,
     response: Response,
     db: Session = Depends(get_db),  # noqa: B008
