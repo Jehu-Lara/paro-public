@@ -5,6 +5,11 @@
 # integracion contra un PostgreSQL real de servicio: es el criterio de salida
 # del ADR 0002 y el que decide si lo que hoy afirmamos sobre constraints,
 # transacciones y tipos se sostiene fuera de SQLite. Ver ADR 0003.
+#
+# El job `changes` decide, segun los paths modificados, cuales de los demas
+# jobs corren: `quality`/`integration-postgres` solo si cambio codigo/deps
+# relevantes, `alembic-dry-run` solo si cambio `alembic/`, y
+# `powerbi-json-validate` solo si cambio un .json bajo `PowerBi/`.
 name: CI
 
 on:
@@ -13,7 +18,34 @@ on:
   pull_request:
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      alembic: ${{ steps.filter.outputs.alembic }}
+      powerbi: ${{ steps.filter.outputs.powerbi }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'src/**'
+              - 'tests/**'
+              - 'alembic/**'
+              - 'pyproject.toml'
+              - 'uv.lock'
+              - '.github/workflows/ci.yml'
+            alembic:
+              - 'alembic/**'
+            powerbi:
+              - 'PowerBi/**/*.json'
+
   quality:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -42,6 +74,8 @@ jobs:
         run: uv run pytest -v
 
   integration-postgres:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     # El riesgo de rendimiento (downgrade+upgrade por prueba) esta anotado como
     # no bloqueante en ADR 0003; este limite solo evita un job colgado.
@@ -90,3 +124,44 @@ jobs:
       # Las unitarias son dominio puro y ya corren en `quality`.
       - name: Pytest (integracion sobre PostgreSQL)
         run: uv run pytest tests/integration -v
+
+  alembic-dry-run:
+    needs: changes
+    if: needs.changes.outputs.alembic == 'true'
+    runs-on: ubuntu-latest
+    env:
+      # No necesita ser alcanzable: `alembic upgrade head --sql` corre en modo
+      # offline (`context.is_offline_mode()`), nunca abre una conexion real.
+      # El dialecto postgresql+psycopg si importa: sin esto, `PARO_DATABASE_URL`
+      # caeria al default de SQLite y el SQL generado no seria el correcto.
+      PARO_DATABASE_URL: postgresql+psycopg://paro:paro@localhost:5432/paro_dry_run
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Set up Python 3.14
+        run: uv python install 3.14
+
+      - name: Install dependencies
+        run: uv sync --extra dev --frozen
+
+      - name: Alembic dry-run (SQL offline, sin conexion a base de datos)
+        run: uv run alembic upgrade head --sql
+
+  powerbi-json-validate:
+    needs: changes
+    if: needs.changes.outputs.powerbi == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Validar JSON de PowerBi
+        run: python scripts/validate_powerbi.py
