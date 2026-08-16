@@ -1,0 +1,112 @@
+table 'public production_record'
+	lineageTag: e99fe41c-105a-4c81-9716-a59c40ed9636
+
+	column id
+		dataType: int64
+		formatString: 0
+		lineageTag: 1677a2c4-ac6c-4591-8815-ac60894263bf
+		summarizeBy: none
+		sourceColumn: id
+
+		annotation SummarizationSetBy = Automatic
+
+	column line_id
+		dataType: int64
+		formatString: 0
+		lineageTag: a344d8c7-1b05-48b9-9333-80d1df006f6b
+		summarizeBy: none
+		sourceColumn: line_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column interval_start
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: b7c42af9-3db1-4f07-82e1-3473689337d1
+		summarizeBy: none
+		sourceColumn: interval_start
+
+		annotation SummarizationSetBy = Automatic
+
+	column interval_end
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: 72386f94-10ff-4d73-8b57-7788a7f6f73f
+		summarizeBy: none
+		sourceColumn: interval_end
+
+		annotation SummarizationSetBy = Automatic
+
+	column total_count
+		dataType: int64
+		formatString: 0
+		lineageTag: 53985685-2b57-45e3-9974-6cae3dd13549
+		summarizeBy: none
+		sourceColumn: total_count
+
+		annotation SummarizationSetBy = Automatic
+
+	column good_count
+		dataType: int64
+		formatString: 0
+		lineageTag: f519a692-c4dd-4323-a11f-e83f56cf860f
+		summarizeBy: none
+		sourceColumn: good_count
+
+		annotation SummarizationSetBy = Automatic
+
+	column ideal_cycle_time_seconds
+		dataType: double
+		lineageTag: 3eb20d16-ce0d-43f9-86db-ea68eb93e9f6
+		summarizeBy: none
+		sourceColumn: ideal_cycle_time_seconds
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column source
+		dataType: string
+		lineageTag: a0d7a57a-9fef-4211-a548-edc02f8333fe
+		summarizeBy: none
+		sourceColumn: source
+
+		annotation SummarizationSetBy = Automatic
+
+	column external_id
+		dataType: string
+		lineageTag: e7a0d2a2-2892-4d6b-98f7-d4c825721a7c
+		summarizeBy: none
+		sourceColumn: external_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column created_at
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: 9b1492c6-a553-449c-9607-0007e1a11d0a
+		summarizeBy: none
+		sourceColumn: created_at
+
+		annotation SummarizationSetBy = Automatic
+
+	column updated_at
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: f1564121-14bd-45c5-a465-263beaa3fd69
+		summarizeBy: none
+		sourceColumn: updated_at
+
+		annotation SummarizationSetBy = Automatic
+
+	partition 'public production_record' = m
+		mode: import
+		source =
+				let
+				    Source = PostgreSQL.Database("ep-floral-mud-aynvah3x.c-5.us-east-2.aws.neon.tech", "neondb"),
+				    public_production_record = Source{[Schema="public",Item="production_record"]}[Data]
+				in
+				    public_production_record
+
+	annotation PBI_ResultType = Table
+

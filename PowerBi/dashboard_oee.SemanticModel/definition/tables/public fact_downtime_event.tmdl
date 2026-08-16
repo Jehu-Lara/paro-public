@@ -1,0 +1,206 @@
+table 'public fact_downtime_event'
+	lineageTag: 3545034b-dc67-411d-891e-7852e311a3c9
+
+	measure Total_Segundos_Paro = SUM('public fact_downtime_event'[duration_seconds])
+		formatString: 0
+		lineageTag: 5940a97a-49bb-4943-9f2c-2ebb57ab964b
+
+	measure %_Pareto_Acumulado = ```
+			
+			VAR Total_Global = CALCULATE([Total_Segundos_Paro], ALL('public fact_downtime_event'[reason_name]))
+			VAR Total_Actual = [Total_Segundos_Paro]
+			VAR Acumulado = 
+			    CALCULATE(
+			        [Total_Segundos_Paro],
+			        FILTER(
+			            ALL('public fact_downtime_event'[reason_name]),
+			            [Total_Segundos_Paro] >= Total_Actual
+			        )
+			    )
+			RETURN
+			    DIVIDE(Acumulado, Total_Global, 0)
+			```
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: e69ec2f2-5b9b-445f-86c0-fe612c7448a6
+
+	column downtime_event_id
+		dataType: int64
+		formatString: 0
+		lineageTag: bbd6d0fb-265a-42f3-aed7-5ef75d739a20
+		summarizeBy: sum
+		sourceColumn: downtime_event_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column line_id
+		dataType: int64
+		formatString: 0
+		lineageTag: d3f97749-ed28-41ed-8ea3-f02d959b72b0
+		summarizeBy: none
+		sourceColumn: line_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column line_code
+		dataType: string
+		lineageTag: 9495689b-05e9-4166-a6aa-77ef01b1f582
+		summarizeBy: none
+		sourceColumn: line_code
+
+		annotation SummarizationSetBy = Automatic
+
+	column line_name
+		dataType: string
+		lineageTag: 54bee760-91b8-4b2d-9096-a69036eb2eb7
+		summarizeBy: none
+		sourceColumn: line_name
+
+		annotation SummarizationSetBy = Automatic
+
+	column line_timezone
+		dataType: string
+		lineageTag: c5a3747c-4b85-46b7-83fc-e75c2f529eb2
+		summarizeBy: none
+		sourceColumn: line_timezone
+
+		annotation SummarizationSetBy = Automatic
+
+	column machine_id
+		dataType: int64
+		formatString: 0
+		lineageTag: 4649cb54-589b-4f4c-baec-42e768227fd3
+		summarizeBy: sum
+		sourceColumn: machine_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column machine_code
+		dataType: string
+		lineageTag: a916904a-fdd1-4ce7-83b1-7f7f5adbbbe2
+		summarizeBy: none
+		sourceColumn: machine_code
+
+		annotation SummarizationSetBy = Automatic
+
+	column machine_name
+		dataType: string
+		lineageTag: 91b8cebb-443d-411f-b7dd-96830f70efa1
+		summarizeBy: none
+		sourceColumn: machine_name
+
+		annotation SummarizationSetBy = Automatic
+
+	column reason_id
+		dataType: int64
+		formatString: 0
+		lineageTag: d515aa54-3e17-40c6-abf4-537adbd0510b
+		summarizeBy: sum
+		sourceColumn: reason_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column reason_code
+		dataType: string
+		lineageTag: 7a8265e8-5f34-4b20-808a-aba12a7fef6c
+		summarizeBy: none
+		sourceColumn: reason_code
+
+		annotation SummarizationSetBy = Automatic
+
+	column reason_name
+		dataType: string
+		lineageTag: 2fcdd76c-0ff4-4d0c-91cd-8de08f46f737
+		summarizeBy: none
+		sourceColumn: reason_name
+
+		annotation SummarizationSetBy = Automatic
+
+	column started_at
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: 34121862-d388-4191-882d-2ba07dda9ffd
+		summarizeBy: none
+		sourceColumn: started_at
+
+		annotation SummarizationSetBy = Automatic
+
+	column ended_at
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: 08b9a37b-7a5b-4862-bdcc-55d9a53eebbb
+		summarizeBy: none
+		sourceColumn: ended_at
+
+		annotation SummarizationSetBy = Automatic
+
+	column is_planned
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: 9d1dd78f-8701-499b-8bd0-be78c644c8ba
+		summarizeBy: none
+		sourceColumn: is_planned
+
+		annotation SummarizationSetBy = Automatic
+
+	column duration_seconds
+		dataType: int64
+		formatString: 0
+		lineageTag: 759b9e5c-0dee-42f7-9b7b-95c8095f3417
+		summarizeBy: sum
+		sourceColumn: duration_seconds
+
+		annotation SummarizationSetBy = Automatic
+
+	column operator_note
+		dataType: string
+		lineageTag: d2a6bb58-e3ac-4a34-9c37-852286836965
+		summarizeBy: none
+		sourceColumn: operator_note
+
+		annotation SummarizationSetBy = Automatic
+
+	column source
+		dataType: string
+		lineageTag: 94980122-1e3d-431c-963b-46fa01b7bacb
+		summarizeBy: none
+		sourceColumn: source
+
+		annotation SummarizationSetBy = Automatic
+
+	column external_id
+		dataType: string
+		lineageTag: 0db01206-1fdc-42df-8c44-00c1d74ff36e
+		summarizeBy: none
+		sourceColumn: external_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column created_at
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: c9ccb4b0-5c91-4262-87fa-9c808f89fac1
+		summarizeBy: none
+		sourceColumn: created_at
+
+		annotation SummarizationSetBy = Automatic
+
+	column updated_at
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: b06b7e94-49d6-4b8e-a420-5086168c029c
+		summarizeBy: none
+		sourceColumn: updated_at
+
+		annotation SummarizationSetBy = Automatic
+
+	partition 'public fact_downtime_event' = m
+		mode: import
+		source =
+				let
+				    Source = PostgreSQL.Database("ep-floral-mud-aynvah3x.c-5.us-east-2.aws.neon.tech", "neondb"),
+				    public_fact_downtime_event = Source{[Schema="public",Item="fact_downtime_event"]}[Data]
+				in
+				    public_fact_downtime_event
+
+	annotation PBI_ResultType = Table
+

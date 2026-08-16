@@ -1,0 +1,18 @@
+table Calendario
+	lineageTag: bc765e32-07c4-463d-94e8-9bc10d71e8d2
+
+	column Date
+		formatString: General Date
+		lineageTag: 9148766a-020f-4917-b3f8-905002597c1c
+		summarizeBy: none
+		isNameInferred
+		sourceColumn: [Date]
+
+		annotation SummarizationSetBy = Automatic
+
+	partition Calendario = calculated
+		mode: import
+		source = CALENDARAUTO()
+
+	annotation PBI_Id = b397d9930ff447daa776c71ef643bf2e
+

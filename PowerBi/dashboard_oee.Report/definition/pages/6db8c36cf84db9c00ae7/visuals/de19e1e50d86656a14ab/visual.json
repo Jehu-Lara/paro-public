@@ -1,0 +1,197 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.11.0/schema.json",
+  "name": "de19e1e50d86656a14ab",
+  "position": {
+    "x": 114.16666666666667,
+    "y": 13.333333333333334,
+    "z": 0,
+    "height": 280,
+    "width": 280,
+    "tabOrder": 0
+  },
+  "visual": {
+    "visualType": "lineClusteredColumnComboChart",
+    "query": {
+      "queryState": {
+        "Category": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "public fact_downtime_event"
+                    }
+                  },
+                  "Property": "reason_name"
+                }
+              },
+              "queryRef": "public fact_downtime_event.reason_name",
+              "nativeQueryRef": "reason_name",
+              "active": true
+            }
+          ]
+        },
+        "Y": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "public fact_downtime_event"
+                    }
+                  },
+                  "Property": "Total_Segundos_Paro"
+                }
+              },
+              "queryRef": "public fact_downtime_event.Total_Segundos_Paro",
+              "nativeQueryRef": "Total_Segundos_Paro"
+            }
+          ]
+        },
+        "Y2": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "public fact_downtime_event"
+                    }
+                  },
+                  "Property": "%_Pareto_Acumulado"
+                }
+              },
+              "queryRef": "public fact_downtime_event.%_Pareto_Acumulado",
+              "nativeQueryRef": "%_Pareto_Acumulado"
+            }
+          ]
+        }
+      },
+      "sortDefinition": {
+        "sort": [
+          {
+            "field": {
+              "Measure": {
+                "Expression": {
+                  "SourceRef": {
+                    "Entity": "public fact_downtime_event"
+                  }
+                },
+                "Property": "Total_Segundos_Paro"
+              }
+            },
+            "direction": "Descending"
+          }
+        ],
+        "isDefaultSort": true
+      }
+    },
+    "drillFilterOtherVisuals": true
+  },
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "384d489014f45408a8aa",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "public fact_downtime_event"
+              }
+            },
+            "Property": "reason_name"
+          }
+        },
+        "type": "Categorical",
+        "filter": {
+          "Version": 2,
+          "From": [
+            {
+              "Name": "p",
+              "Entity": "public fact_downtime_event",
+              "Type": 0
+            }
+          ],
+          "Where": [
+            {
+              "Condition": {
+                "Not": {
+                  "Expression": {
+                    "In": {
+                      "Expressions": [
+                        {
+                          "Column": {
+                            "Expression": {
+                              "SourceRef": {
+                                "Source": "p"
+                              }
+                            },
+                            "Property": "reason_name"
+                          }
+                        }
+                      ],
+                      "Values": [
+                        [
+                          {
+                            "Literal": {
+                              "Value": "null"
+                            }
+                          }
+                        ]
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "objects": {
+          "general": [
+            {
+              "properties": {
+                "isInvertedSelectionMode": {
+                  "expr": {
+                    "Literal": {
+                      "Value": "true"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "862c3ea41132cd68d300",
+        "field": {
+          "Measure": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "public fact_downtime_event"
+              }
+            },
+            "Property": "Total_Segundos_Paro"
+          }
+        },
+        "type": "Advanced"
+      },
+      {
+        "name": "89ecdaa52f63930efdce",
+        "field": {
+          "Measure": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "public fact_downtime_event"
+              }
+            },
+            "Property": "%_Pareto_Acumulado"
+          }
+        },
+        "type": "Advanced"
+      }
+    ]
+  }
+}

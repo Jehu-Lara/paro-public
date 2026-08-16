@@ -33,3 +33,10 @@ desktop.ini
 # Ruido conocido de este entorno Windows (Git Bash crea 'nul' como archivo real).
 nul
 
+# Power BI (formato PBIP): artefactos locales, no fuente. cache.abf es el
+# cache binario del modelo semantico; localSettings.json trae un blob
+# cifrado (DPAPI) ligado a la cuenta de Windows de quien abrio el .pbip.
+# Ninguno de los dos se versiona -- guia oficial de Microsoft para PBIP.
+PowerBi/**/.pbi/cache.abf
+PowerBi/**/.pbi/localSettings.json
+
