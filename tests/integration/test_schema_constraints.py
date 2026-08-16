@@ -15,7 +15,7 @@ from sqlalchemy import Engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from paro.db.models import DowntimeEvent, DowntimeReason, ProductionLine, ProductionRecord
+from paro.db.models import AuditLog, DowntimeEvent, DowntimeReason, ProductionLine, ProductionRecord
 
 
 def _make_line(session: Session, code: str = "L1") -> ProductionLine:
@@ -176,6 +176,19 @@ def test_invalid_foreign_key_rejected(migrated_engine: Engine) -> None:
                 ended_at=now + timedelta(minutes=5),
                 reason_id=reason.id,
                 is_planned=False,
+            )
+        )
+        with pytest.raises(IntegrityError):
+            session.commit()
+
+
+def test_audit_log_invalid_foreign_key_rejected(migrated_engine: Engine) -> None:
+    with Session(migrated_engine) as session:
+        session.add(
+            AuditLog(
+                downtime_event_id=999_999,
+                changed_fields={"operator_note": [None, "corrected"]},
+                actor="tester",
             )
         )
         with pytest.raises(IntegrityError):

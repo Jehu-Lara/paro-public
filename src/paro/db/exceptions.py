@@ -8,9 +8,10 @@ information to build a useful 409 without re-querying the row.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
-__all__ = ["DuplicateWithDifferentPayloadError"]
+__all__ = ["DuplicateWithDifferentPayloadError", "StaleUpdateError"]
 
 
 class DuplicateWithDifferentPayloadError(Exception):
@@ -38,4 +39,31 @@ class DuplicateWithDifferentPayloadError(Exception):
         super().__init__(
             f"{entity}: source={source!r} external_id={external_id!r} already exists with "
             f"different data in: {fields}"
+        )
+
+
+class StaleUpdateError(Exception):
+    """A PATCH's ``expected_updated_at`` no longer matches the row's current value.
+
+    Optimistic-concurrency conflict: someone else updated the row between
+    the caller reading it and submitting this PATCH. Carries both
+    timestamps so the caller can decide whether to re-fetch and retry
+    without a second round trip.
+    """
+
+    def __init__(
+        self,
+        *,
+        entity: str,
+        id: int,
+        expected_updated_at: datetime,
+        actual_updated_at: datetime,
+    ) -> None:
+        self.entity = entity
+        self.id = id
+        self.expected_updated_at = expected_updated_at
+        self.actual_updated_at = actual_updated_at
+        super().__init__(
+            f"{entity} id={id}: expected_updated_at={expected_updated_at!r} does not match "
+            f"the current updated_at={actual_updated_at!r}"
         )

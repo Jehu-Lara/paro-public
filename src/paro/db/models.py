@@ -11,8 +11,10 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     CheckConstraint,
     Date,
@@ -30,6 +32,7 @@ from paro.db.base import Base
 from paro.db.types import UTCDateTime
 
 __all__ = [
+    "AuditLog",
     "DowntimeEvent",
     "DowntimeReason",
     "Machine",
@@ -117,6 +120,26 @@ class DowntimeEvent(Base):
     updated_at: Mapped[datetime] = mapped_column(
         UTCDateTime, nullable=False, default=_now_utc, onupdate=_now_utc
     )
+
+
+class AuditLog(Base):
+    """One row per PATCH that actually changed a ``downtime_event``.
+
+    Scoped to ``downtime_event`` corrections only, not a generic
+    polymorphic audit table -- see ``docs/downtime-corrections.md``.
+    ``actor`` is free-text supplied by the caller, same trust level as
+    ``downtime_event.operator_note``: real auth is separately out of scope,
+    so it's not a verified identity.
+    """
+
+    __tablename__ = "audit_log"
+    __table_args__ = (Index("ix_audit_log_downtime_event_id", "downtime_event_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    downtime_event_id: Mapped[int] = mapped_column(ForeignKey("downtime_event.id"), nullable=False)
+    changed_fields: Mapped[dict[str, list[Any]]] = mapped_column(JSON, nullable=False)
+    actor: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    changed_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False, default=_now_utc)
 
 
 class ProductionRecord(Base):

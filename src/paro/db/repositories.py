@@ -23,10 +23,11 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from paro.db.exceptions import DuplicateWithDifferentPayloadError
-from paro.db.models import DowntimeEvent, ProductionRecord
+from paro.db.exceptions import DuplicateWithDifferentPayloadError, StaleUpdateError
+from paro.db.models import AuditLog, DowntimeEvent, ProductionRecord
+from paro.json_safe import json_safe
 
-__all__ = ["create_downtime_event", "create_production_record"]
+__all__ = ["create_downtime_event", "create_production_record", "update_downtime_event"]
 
 
 def _is_unique_violation(
@@ -211,3 +212,54 @@ def create_production_record(
             ) from exc
         return existing, False
     return record, True
+
+
+def update_downtime_event(
+    session: Session,
+    *,
+    event: DowntimeEvent,
+    expected_updated_at: datetime,
+    changes: dict[str, Any],
+    actor: str | None,
+) -> tuple[DowntimeEvent, bool]:
+    """Applies a partial correction to ``event``; returns ``(event, was_changed)``.
+
+    ``expected_updated_at`` must match ``event.updated_at`` or this raises
+    :class:`StaleUpdateError` -- optimistic concurrency, no row lock held
+    between the caller reading the row and submitting this call.
+
+    ``changes`` holds only the fields the caller actually sent (see
+    ``DowntimeEventPatch.model_fields_set`` at the call site); a value equal
+    to the current one is filtered out here too, so resubmitting identical
+    values is a no-op, same idempotent philosophy as
+    :func:`create_downtime_event`. A no-op writes no ``audit_log`` row and
+    leaves ``updated_at`` untouched.
+    """
+    if event.updated_at != expected_updated_at:
+        raise StaleUpdateError(
+            entity="downtime_event",
+            id=event.id,
+            expected_updated_at=expected_updated_at,
+            actual_updated_at=event.updated_at,
+        )
+
+    diff: dict[str, list[Any]] = {}
+    for field, new_value in changes.items():
+        old_value = getattr(event, field)
+        if old_value != new_value:
+            diff[field] = [old_value, new_value]
+            setattr(event, field, new_value)
+
+    if not diff:
+        return event, False
+
+    session.flush()
+    session.add(
+        AuditLog(
+            downtime_event_id=event.id,
+            changed_fields=json_safe(diff),
+            actor=actor,
+        )
+    )
+    session.flush()
+    return event, True

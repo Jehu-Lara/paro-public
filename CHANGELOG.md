@@ -20,6 +20,55 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   itself (preflight `Access-Control-Allow-Methods` excludes `POST`), not
   just that the middleware is registered. No new `Settings`/env var - every
   origin is allowed for reads, nothing to configure per-environment.
+- `PATCH /api/v1/downtime-events/{id}` for partial corrections, with
+  optimistic concurrency and an `audit_log` table - the two backlog items
+  the README's "Out of MVP scope" table listed as depending on each other.
+  Design rationale (concurrency-token alternative considered, `audit_log`
+  grain, why `actor` is unauthenticated free-text) is in the new
+  `docs/downtime-corrections.md`, not repeated here.
+  - Concurrency: the request body requires `expected_updated_at`; a
+    mismatch against the row's current `updated_at` raises the new
+    `StaleUpdateError` (`db/exceptions.py`) -> 409
+    (`{"error": "stale_update", ...}`, handled in `api/errors.py` alongside
+    the existing `DuplicateWithDifferentPayloadError`). Reuses the
+    `updated_at` column that already existed with `onupdate` wired, instead
+    of adding a dedicated `version` column.
+  - New `DowntimeEventPatch` schema (`api/schemas/downtime.py`): every field
+    but `expected_updated_at` is optional, and presence is read from
+    Pydantic's `model_fields_set` (not a `None` default) so the router can
+    tell "omitted" apart from "explicitly set to null" - needed because
+    `machine_id`/`ended_at`/`operator_note` are genuinely nullable columns.
+    The three NOT NULL columns that are still patchable (`started_at`,
+    `reason_id`, `is_planned`) get an explicit null-rejection check in the
+    router (`_NOT_NULLABLE_PATCH_FIELDS`) so an explicit `null` there is a
+    422, not an `IntegrityError` surfacing as a 500.
+  - New `db/repositories.py::update_downtime_event`: diffs only the fields
+    the caller actually sent against the row's current values: an empty
+    diff (resubmitting identical values) is a no-op - no `audit_log` row,
+    `updated_at` untouched - same idempotent philosophy as
+    `create_downtime_event`. A non-empty diff applies the changes, flushes
+    (firing `onupdate`), and writes one `AuditLog` row with a JSON
+    `{field: [old, new]}` diff.
+  - `errors.py::_json_safe` (Decimal -> str, datetime -> isoformat) moved to
+    a new dependency-free `paro/json_safe.py`, so `db/repositories.py` can
+    reuse it for the audit diff without `paro.db` importing from `paro.api`
+    (the dependency direction `db/exceptions.py`'s docstring already commits
+    to). `errors.py` now imports it from there instead of defining it
+    locally; the 409 bodies it produces are unchanged.
+  - Migration `0004_audit_log.py`: new `audit_log` table (`downtime_event_id`
+    FK, `changed_fields` JSON, `actor`, `changed_at`) plus an index on
+    `downtime_event_id`. Pure `CREATE TABLE`, no batch-mode/view dance like
+    migration 0003 needed - nothing existing is altered. Verified both
+    directions locally (`alembic upgrade head` / `downgrade -1` / `upgrade
+    head` all clean) before this was committed.
+  - `README.md`: `PATCH /downtime-events/{id}` moved into `## MVP scope`'s
+    endpoint list; its row and `audit_log`'s removed from "Out of MVP
+    scope" (both now implemented).
+  - New `tests/integration/test_api_downtime_patch.py` (success + audit-log
+    shape, stale-token 409, no-op no-audit-row, unknown event/machine/reason
+    404s, invalid merged interval and naive timestamp 422s);
+    `test_migration.py` and `test_schema_constraints.py` extended to cover
+    the new table and its FK.
 - `GET /health` now reports two independent signals instead of only process
   liveness: the existing `status`/`version` fields (unconditionally 200,
   unchanged), plus a new `database: "ok" | "unreachable"` field from a

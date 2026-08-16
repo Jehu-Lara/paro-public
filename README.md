@@ -56,7 +56,8 @@ PARO **is not a dashboard**. It's the service underneath one:
 
 ## MVP scope
 
-- 4 endpoints: `GET /health`, `POST /api/v1/downtime-events`, `POST /api/v1/production-records`,
+- 5 endpoints: `GET /health`, `POST /api/v1/downtime-events`,
+  `PATCH /api/v1/downtime-events/{id}`, `POST /api/v1/production-records`,
   `GET /api/v1/oee`.
 - Pure OEE engine in Python, no infrastructure dependencies.
 - PostgreSQL + SQLAlchemy 2 (sync) + Alembic.
@@ -72,8 +73,6 @@ Deliberate decisions, documented in `docs/adr/`. Listed here so the project
 
 | Out of scope | Reason |
 |---|---|
-| `PATCH /downtime-events/{id}` and optimistic concurrency | Not needed to demonstrate the core competency; ~5 h |
-| Correction history / audit trail (`audit_log`) | Depends on the `PATCH` above; ~4 h |
 | `GET /losses/pareto` as a REST endpoint | The SQL view already serves the same data to Power BI |
 | Physical date table | Power BI generates it with `CALENDARAUTO()` |
 | AI/LLM, frontend, authentication, sensors, MES | Out of scope by design |
@@ -125,6 +124,8 @@ open events) is documented in `docs/oee-definition.md`.
 
 - Demo data is **synthetic** and marked as such.
 - No authentication: the service is meant to run on an internal network.
+  `POST`/`PATCH` write endpoints are excluded from CORS (browser JS on
+  another origin can't call them); reads (`GET`) are open to any origin.
 - Shifts are modeled as concrete instances, not recurrence rules.
 
 ## Roadmap
