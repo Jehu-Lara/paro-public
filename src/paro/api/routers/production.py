@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
 from paro.api.deps import get_db
-from paro.api.rate_limit import limiter
+from paro.api.rate_limit import is_trusted_ingest, limiter
 from paro.api.schemas.production import ProductionRecordCreate, ProductionRecordResponse
 from paro.db.models import ProductionLine
 from paro.db.repositories import create_production_record
@@ -17,7 +17,7 @@ router = APIRouter(prefix="/api/v1", tags=["production-records"])
 
 
 @router.post("/production-records", response_model=ProductionRecordResponse)
-@limiter.limit("30/minute")
+@limiter.limit("30/minute", exempt_when=is_trusted_ingest)
 def post_production_record(
     request: Request,
     payload: ProductionRecordCreate,
