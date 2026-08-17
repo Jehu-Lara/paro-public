@@ -101,6 +101,31 @@ check that compares database rows across two runs and finds different
 The only cross-run comparison that's meaningful is the pre-transport event
 stream hash.
 
+**Implementation note (Step 3): dataclass equality, not a canonical-dump
+hash, is what actually verifies this today.** The paragraphs above describe
+hashing a canonical dump of the generated event stream as the verification
+mechanism. `scripts/simulator/generator.py`'s own tests
+(`tests/unit/test_simulator_generator.py::test_generation_is_deterministic_for_the_same_seed`)
+instead call `generate()` twice with the same seed/config and assert the
+two returned `GeneratedRun` values are equal — direct `==` on two
+`@dataclass(frozen=True)` instances, which recursively compares every
+field of every `ProductionRecordDraft` and `DowntimeEventDraft` in both
+sorted tuples. This is at least as strong as the hash comparison for what
+it actually checks (same order, same values, every field — this
+contract's own wording), since dataclass equality can't collide the way a
+hash theoretically could, and it needs no extra utility code to exist. It
+does not, however, replace the hash for every future purpose: a hash is
+still the right tool once the QA Agent (Step 5) needs to compare two runs
+*without* holding both complete `GeneratedRun`s in memory at once — e.g.
+comparing a run against a previously-recorded fingerprint from disk, or
+across process boundaries, at the acceptance run's scale (10k+ rows).
+Building that canonical-dump-and-hash utility remains out of scope for
+Step 3, exactly as scoped in
+[ADR 0004](adr/0004-simulator-multi-agent-architecture.md)'s Step 5 QA-Agent
+work — this note only documents which mechanism Step 3 itself relies on,
+and why it's sufficient for Step 3's own tests without yet building the
+hash path.
+
 ## 3. RNG substreams
 
 One `random.Random` instance per simulated machine, seeded deterministically
@@ -383,6 +408,46 @@ apart. Final catalog (9 rows, `scripts/seed_demo.py`):
 | `ATC-M` | Atasco de material | false | Micro-stop class: material_jam |
 | `DES-M` | Desabasto de material | false | Micro-stop class: starvation |
 | `AJT-M` | Ajuste menor | false | Micro-stop class: minor_adjustment |
+
+**Known duplication (Step 3): reason codes are redefined, not imported,
+across two files — deliberately, with a documented failure mode.**
+`scripts/seed_demo.py` (which seeds the actual `downtime_reason` rows) and
+`scripts/simulator/config.py` (which drives the generator's own reason-mix
+logic) each define their own copy of the eight code strings the generator
+needs (`CHG-P`, `FLA-M`, `FLA-E`, `FLA-N`, `FLA-S`, `ATC-M`, `DES-M`,
+`AJT-M`). Seven of the eight share both the same constant *name* and the
+same string *value* across both files; the eighth (`"FLA-M"`) shares only
+the value — `scripts/seed_demo.py` names its constant
+`REASON_UNPLANNED_CODE` (predating the reason-mix catalog work),
+`scripts/simulator/config.py` names it `REASON_FAILURE_MECHANICAL_CODE`.
+`scripts/simulator/config.py`'s own docstring for these constants explains
+*why* they're redefined rather than imported (`scripts/seed_demo.py` is a
+one-off dev seed, not a canonical source), but the risk is real either
+way: if either file's string value is retyped and the other isn't updated
+to match, the two files silently disagree about what a code means, and
+nothing catches that by inspection.
+
+What actually catches it: `generate()`'s `_validate()`
+(`scripts/simulator/generator.py`) checks every code the generator needs
+against the caller-supplied `SimulatorConfig.reason_ids` mapping
+(`downtime_reason.code -> DB id`) and raises `ValueError` immediately if
+any are missing — covered by
+`tests/unit/test_simulator_generator.py::test_missing_reason_code_raises_before_generation`.
+Since `reason_ids` has to be built by querying the real `downtime_reason`
+table (by whichever future step wires the generator to a live DB — Step
+3+ transport, not built yet), a drift between `scripts/seed_demo.py`'s
+seeded codes and `scripts/simulator/config.py`'s expected codes surfaces
+as a hard failure the first time that mapping is built and passed in —
+not as silently-wrong data. This is fail-fast-on-use, not compile-time or
+automatic sync: nothing prevents the two files' constants from drifting
+apart *before* that point, and no linter or test in this repository
+currently cross-checks `scripts/seed_demo.py`'s catalog against
+`scripts/simulator/config.py`'s expected codes directly. If this class of
+bug ever actually happens, the fix is a shared constants module both files
+import from — not attempted now, since it would mean promoting one of two
+dev/build scripts to canonical-source status (or introducing a third
+module) for a duplication whose failure mode is already caught, just later
+than compile time, by `_validate()`.
 
 ### 4.7 Simplification, named as a future upgrade
 
@@ -713,6 +778,41 @@ ACCEPTANCE_BAND_OEE_MIN = 0.70
 ACCEPTANCE_BAND_OEE_MAX = 0.80
 ACCEPTANCE_BAND_REASON_MIX_RELATIVE = 0.20
 ```
+
+**float vs. Decimal — resolved (Step 3), and binding on every future
+module that samples from these constants.** Every constant above is
+`float`, not `Decimal`, and every RNG draw that consumes them
+(`random.gauss`, `random.lognormvariate`, `random.uniform`,
+`random.random()`, `random.choices`) stays in `float` end to end. This is
+not an exception to the project's "every numeric calculation uses
+Decimal, never float" rule — it's outside that rule's scope. The stdlib's
+`random` module has no Decimal-typed distribution sampler (no
+`Decimal`-native Gaussian, lognormal, or weighted-categorical draw exists
+anywhere in the standard library), so implementing distribution sampling
+in Decimal would mean hand-rolling a Box-Muller-equivalent purely to
+avoid float, for a synthetic-data generator where the whole point of the
+draw is randomized realism, not reproducible financial precision. The
+rule's actual target is any quantity that gets *persisted or compared for
+correctness* — and every such quantity in this module stays outside the
+float path entirely: `ideal_cycle_time_seconds` is supplied by the caller
+as `Decimal` (`LineConfig.ideal_cycle_time_seconds`,
+`scripts/simulator/model.py`) and passed through to every
+`ProductionRecordDraft` unchanged — never computed from, or rounded
+through, any of the float constants above. `total_count`/`good_count` are
+plain `int`, incremented once per cycle, never derived from a float
+division or ratio. The only float-derived values in the generator's
+output are `datetime` timestamps (`started_at`/`ended_at`/
+`interval_start`/`interval_end`), which were never a Decimal concern to
+begin with — `datetime`/`timedelta` accept float seconds natively, same
+as any other duration arithmetic in this codebase.
+
+Precedent for the rest of the project, not just this module: statistical/
+RNG sampling code is float by construction and exempt from the Decimal
+rule; anything that gets written to a schema column typed
+`Numeric`/`Decimal`, or compared against an acceptance band, is not, and
+must stay `Decimal` (or `int`, where the schema says so) all the way
+through, with no float step in between. This module is the citable
+example of both halves of that line, not just the first one.
 
 ## Out of scope for this document
 

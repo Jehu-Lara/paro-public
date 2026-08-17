@@ -554,6 +554,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "ruff" },
+    { name = "tzdata", marker = "sys_platform == 'win32'" },
 ]
 
 [package.dev-dependencies]
@@ -563,6 +564,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "ruff" },
+    { name = "tzdata", marker = "sys_platform == 'win32'" },
 ]
 
 [package.metadata]
@@ -579,6 +581,7 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.14" },
     { name = "slowapi", specifier = ">=0.1.10" },
     { name = "sqlalchemy", specifier = ">=2.0.51" },
+    { name = "tzdata", marker = "sys_platform == 'win32' and extra == 'dev'", specifier = ">=2026.1" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.38" },
 ]
 provides-extras = ["dev"]
@@ -590,6 +593,7 @@ dev = [
     { name = "pytest", specifier = ">=8.4" },
     { name = "pytest-cov", specifier = ">=7.0" },
     { name = "ruff", specifier = ">=0.14" },
+    { name = "tzdata", marker = "sys_platform == 'win32'", specifier = ">=2026.1" },
 ]
 
 [[package]]
