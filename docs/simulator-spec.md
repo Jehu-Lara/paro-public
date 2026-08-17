@@ -221,12 +221,14 @@ more cycles into the same Run Time: N = R / mean_cycle(T). At T=30s,
 N ≈ 2,085 cycles/machine-day.
 
 `production_record` count is unaffected by any of this: 96 15-minute
-buckets/machine-day, time-based, independent of T, rates, or N.
+buckets/line-day (see section 5's resolved production_record-grain note),
+time-based, independent of T, rates, or N.
 
-**Acceptance run (14 days × 8 machines = 112 machine-days):**
+**Acceptance run (14 days × 8 machines = 112 machine-days; 14 days × 2
+lines = 28 line-days):**
 
-- `production_record`: 96 × 112 = **10,752**
-- `downtime_event`: 69.29 × 112 = **7,761**
+- `production_record`: 96 × 28 = **2,688** (line-days — section 5)
+- `downtime_event`: 69.29 × 112 = **7,761** (machine-days — unaffected)
 - Expected failure events: 3.753 × 112 ≈ **420**
 
 ### 4.1 Cycle time
@@ -467,14 +469,41 @@ been shown to matter yet.
 - **Simulation:** per-cycle (every individual unit cycle is simulated:
   drawn cycle time, scrap outcome, and any triggered stoppage).
 - **Persistence:** cycles are aggregated into one `production_record` per
-  15-minute bucket per machine (`total_count`, `good_count`,
-  `ideal_cycle_time_seconds` for that bucket) — matching the existing
-  `production_record` schema's grain and the 96-buckets/machine/day figure
-  the write-volume arithmetic (section 6) already depends on. Each
-  stoppage (micro-stop, failure, or planned changeover) is persisted as
-  exactly **one row** in `downtime_event`, at its own actual
-  `started_at`/`ended_at` — never aggregated, since `downtime_event` is
-  already event-grained in the schema.
+  15-minute bucket **per line** (`total_count`, `good_count`,
+  `ideal_cycle_time_seconds` for that bucket, summed across every machine
+  on the line) — matching the existing `production_record` schema's grain
+  and the 96-buckets/line/day figure the write-volume arithmetic
+  (section 6) already depends on. Each stoppage (micro-stop, failure, or
+  planned changeover) is persisted as exactly **one row** in
+  `downtime_event`, at its own actual `started_at`/`ended_at`, per
+  machine — never aggregated, since `downtime_event` is already
+  event-grained (and machine-grained, via its nullable `machine_id`) in
+  the schema.
+
+**Corrected (Step 3): `production_record` grain is per line, not per
+machine — the text above originally said "per machine," and was wrong.**
+`production_record` (`src/paro/db/models.py:145-165`) has no `machine_id`
+column — the model's own docstring says "a production count over a time
+interval for a **line**." This spec originally assumed a per-machine
+grain throughout (the "96-buckets/machine/day" figure this section used
+to state, and every number derived from it in sections 4.0 and 6 below),
+which doesn't exist in the schema and never did. Caught during Step 3
+implementation (`scripts/simulator/generator.py`'s `_bucket_line`), not
+before — verified twice (independent grep, then a direct read of the
+model file) before committing to the per-line design, and only surfaced
+to review as a line item in the fix that follows, not folded into the
+commit that introduced it. Consequence: `ideal_cycle_time_seconds` is a
+**per-line** value (`LineConfig.ideal_cycle_time_seconds`, shared by every
+machine on that line), not per-machine as section 4.1 originally implied;
+every machine on a line still draws its own cycle times independently
+(own RNG substream, same target `T`), but the bucketed `production_record`
+row sums `total_count`/`good_count` across all of a line's machines for
+that 15-minute window. Every `production_record` count in sections 4.0
+and 6 below, and the SMOKE structural check in section 7, are corrected
+to the per-line figure (14 days × 2 lines = 28 line-days at acceptance
+scale, not 14 days × 8 machines = 112 machine-days); `downtime_event`
+counts are untouched by this correction since that table was already
+per-machine-grained (`machine_id` FK) before Step 3 and stays so.
 
 **Empty buckets are written explicitly, not skipped.** A stoppage spanning
 part or all of a 15-minute window still gets a `production_record` row for
@@ -484,7 +513,7 @@ schema-legal: `valid_counts` (`src/paro/db/models.py:151`) is
 `ProductionRecordCreate.total_count: int = Field(ge=0)`
 (`src/paro/api/schemas/production.py:38`) — both allow zero. Writing zeros
 instead of skipping keeps "exactly 96 contiguous, non-overlapping buckets
-per machine per simulated day, no gaps" a deterministic structural
+per line per simulated day, no gaps" a deterministic structural
 invariant (section 7): skipping would make row count stoppage-pattern-
 dependent, and "correctly skipped" indistinguishable from "bug dropped a
 bucket" — exactly the distinction the QA Agent exists to catch. That
@@ -493,7 +522,7 @@ empty buckets away later without also dropping the check that depends on
 them.
 
 **Do not change the 15-minute bucket granularity to reduce write volume.**
-Hourly buckets would cut `production_record` from 10,752 to 2,688 and look
+Hourly buckets would cut `production_record` from 2,688 to 672 and look
 like an easy win against the rate-limit arithmetic below — but persistence
 granularity is a decision about what the dashboard needs (an hourly OEE
 trend is coarser than what `docs/analytics.md`'s per-record grain supports
@@ -514,24 +543,31 @@ one 30-requests/minute budget for the whole run.
 
 | Phase | production_record | downtime_event | Total writes | Time @ 30/min |
 |---|---:|---:|---:|---:|
-| Smoke (1 day × 2 machines) | 192 | 139 | 331 | 11.0 min |
-| Smoke + idempotency re-run | 384 | 278 | 662 | 22.1 min |
-| 5 rounds (smoke + idempotency each) | 1,920 | 1,390 | 3,310 | 110.3 min (1h50m) |
-| Acceptance run (14d × 8m, once) | 10,752 | 9,137 | 19,889 | 663.0 min (11h03m) |
-| **Full Developer/QA loop (5 rounds + acceptance)** | **12,672** | **10,527** | **23,199** | **~773.3 min (~12h53m)** |
+| Smoke (1 day × 2 machines, same line) | 96 | 139 | 235 | 7.8 min |
+| Smoke + idempotency re-run | 192 | 278 | 470 | 15.7 min |
+| 5 rounds (smoke + idempotency each) | 960 | 1,390 | 2,350 | 78.3 min (1h18m) |
+| Acceptance run (14d × 8m, once) | 2,688 | 9,137 | 11,825 | 394.2 min (6h34m) |
+| **Full Developer/QA loop (5 rounds + acceptance)** | **3,648** | **10,527** | **14,175** | **~472.5 min (~7h53m)** |
 
 (Smoke/idempotency/5-rounds rows use section 4.0's flat baseline rate —
 which specific 2 machines a smoke run picks, and therefore whether either is
 the bottleneck machine, isn't fixed by this spec, so the flat rate is kept
 as an order-of-magnitude estimate; it doesn't affect those rounds'
+structural-only pass/fail. The `production_record` column for these three
+rows carries a second, new assumption the pre-Step-3 per-machine model
+never had to make: that the smoke run's 2 machines share one line (96
+buckets/day, matching `scripts/simulator/generator.py`'s own smoke-scale
+test setup) rather than sitting on two different lines (192 buckets/day).
+Also order-of-magnitude, for the same reason — it doesn't affect
 structural-only pass/fail. The acceptance run and full-loop rows use the
 chosen topology's fleet-real rate — 25% of the fleet is the bottleneck
 machine, section 4.5 — since that run deterministically covers all 8
 machines: 74.25 micro-stop + 4.33 failure = 78.58 unplanned events/
 machine-day, + 3 planned = 81.58 total `downtime_event`/machine-day, vs.
 69.29 at the flat baseline (+17.7%). `downtime_event` = 81.58 × 112 =
-9,136.85 → 9,137. `production_record` is unaffected — it's time-based, not
-rate-based.)
+9,136.85 → 9,137, unaffected by the production_record-grain correction.
+`production_record` at acceptance scale is exact, not order-of-magnitude:
+96 × 28 line-days = 2,688 (section 5).)
 
 This isn't just the acceptance run — the limiter blocks the *entire*
 round-trip loop the QA Agent's cap depends on being fast (see
@@ -644,7 +680,7 @@ sample is actually large enough to mean something (section 8).
     a 15-minute boundary, and no single simulated cycle is split across two
     buckets and double-counted in both.
   - **Exactly 96 contiguous, non-overlapping `production_record` buckets per
-    machine per simulated day, covering the full 24 hours with no gaps** —
+    line per simulated day, covering the full 24 hours with no gaps** —
     only checkable because empty buckets are written explicitly rather than
     skipped (section 5). A dropped bucket and a deliberately-skipped one are
     otherwise indistinguishable; this is the check that tells them apart.
