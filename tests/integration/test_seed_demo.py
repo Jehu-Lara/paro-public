@@ -11,7 +11,7 @@ from scripts.seed_demo import run
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
-from paro.db.models import DowntimeEvent
+from paro.db.models import DowntimeEvent, DowntimeReason
 
 
 def test_running_seed_twice_produces_identical_counts(migrated_engine: Engine) -> None:
@@ -24,6 +24,27 @@ def test_running_seed_twice_produces_identical_counts(migrated_engine: Engine) -
     assert counts_first_run == counts_second_run
     assert counts_first_run["downtime_event"] == 4
     assert counts_first_run["production_record"] == 1
+    assert counts_first_run["downtime_reason"] == 9
+
+
+def test_seed_contains_the_full_downtime_reason_catalog(migrated_engine: Engine) -> None:
+    with Session(migrated_engine) as session:
+        run(session)
+
+        rows = session.execute(select(DowntimeReason.code, DowntimeReason.default_is_planned)).all()
+        codes_and_planned = {row.code: row.default_is_planned for row in rows}
+
+    assert codes_and_planned == {
+        "MTN-P": True,
+        "CHG-P": True,
+        "FLA-M": False,
+        "FLA-E": False,
+        "FLA-N": False,
+        "FLA-S": False,
+        "ATC-M": False,
+        "DES-M": False,
+        "AJT-M": False,
+    }
 
 
 def test_seed_contains_an_open_downtime_event(migrated_engine: Engine) -> None:
