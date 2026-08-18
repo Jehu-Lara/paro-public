@@ -234,7 +234,7 @@ lines = 28 line-days):**
 ### 4.1 Cycle time
 
 Truncated normal: mean `1.11 × T`, sd `0.09 × T`, truncated to
-`[0.95, 1.60] × T`, where `T = IDEAL_CYCLE_TIME_SECONDS` (per-machine,
+`[0.95, 1.60] × T`, where `T = IDEAL_CYCLE_TIME_SECONDS` (per-line,
 simulator-config-only — see provenance note above). Sampled via rejection
 on `random.gauss(mean, sd)`, redrawing until the value falls inside the
 truncation bounds (no closed-form truncated-normal in stdlib).
@@ -764,7 +764,7 @@ call, but no value here may drift from section 4 without a spec revision):
 
 ```
 MASTER_SEED = 42                    # fixed, confirmed 2026-08-16
-IDEAL_CYCLE_TIME_SECONDS            # per machine, simulator-config only — 4.1
+IDEAL_CYCLE_TIME_SECONDS            # per line, simulator-config only — 4.1
 CYCLE_TIME_MEAN_MULTIPLIER = 1.11
 CYCLE_TIME_SD_MULTIPLIER = 0.09
 CYCLE_TIME_TRUNC_MIN_MULTIPLIER = 0.95

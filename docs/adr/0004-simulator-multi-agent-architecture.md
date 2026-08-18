@@ -3,6 +3,32 @@
 - **Status:** proposed
 - **Date:** 2026-08-16
 
+## Revision (2026-08-18)
+
+Still status "proposed". Amended in place again, same pattern as the
+2026-08-16 revision above. The "MAS team" section below describes a
+Developer Agent that iteratively writes and revises the simulator's
+source, gated by a QA Agent, because at the time this ADR was written no
+human was going to hand-write the simulator. That premise stopped being
+true during Steps 3-4 (commits ab6677f, 283770c, 27d1591, 9476294):
+scripts/simulator/generator.py, client.py, transport.py, and
+scripts/simulate_production.py were all written and reviewed by hand,
+not by an autonomous Developer Agent. By the time Step 5 was reached,
+there was no more code-generation task left for a Developer Agent to
+gate, and no round-tripping loop to build.
+
+**Step 5, as actually built: QA Agent checks only — no Developer Agent,
+no LangGraph, no Ollama.** scripts/simulator/qa.py and
+scripts/qa_simulator.py implement simulator-spec.md section 7's
+SMOKE/IDEMPOTENCY checks and section 8's ACCEPTANCE statistical bands,
+run against a real disposable database through the already-built
+generate()/transport() pipeline. The "Tech stack for orchestration"
+section below (LangGraph selection, Ollama) was never implemented and is
+no longer planned — the concern that motivated ruling those dependencies
+out of the runtime dependency list is moot, since neither was ever added.
+Left in place below as a record of the evaluation that was done, not as
+a description of what was built.
+
 ## Context
 
 The PARO backend MVP (schema, repositories, API, analytics views, Power BI
