@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
+from paro.api.auth import require_api_key
 from paro.api.deps import get_db
 from paro.api.rate_limit import is_trusted_ingest, limiter
 from paro.api.schemas.production import ProductionRecordCreate, ProductionRecordResponse
@@ -23,6 +24,7 @@ def post_production_record(
     payload: ProductionRecordCreate,
     response: Response,
     db: Session = Depends(get_db),  # noqa: B008
+    _api_key_check: None = Depends(require_api_key),
 ) -> ProductionRecordResponse:
     """Records a production count.
 

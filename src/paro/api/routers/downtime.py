@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
+from paro.api.auth import require_api_key
 from paro.api.deps import get_db
 from paro.api.rate_limit import is_trusted_ingest, limiter
 from paro.api.schemas.downtime import DowntimeEventCreate, DowntimeEventPatch, DowntimeEventResponse
@@ -38,6 +39,7 @@ def post_downtime_event(
     payload: DowntimeEventCreate,
     response: Response,
     db: Session = Depends(get_db),  # noqa: B008
+    _api_key_check: None = Depends(require_api_key),
 ) -> DowntimeEventResponse:
     """Records a downtime event.
 
@@ -79,6 +81,7 @@ def patch_downtime_event(
     id: int,
     payload: DowntimeEventPatch,
     db: Session = Depends(get_db),  # noqa: B008
+    _api_key_check: None = Depends(require_api_key),
 ) -> DowntimeEventResponse:
     """Applies a partial correction to a downtime event.
 

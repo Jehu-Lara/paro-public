@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./paro.db"
     default_timezone: str = "America/Monterrey"
     trusted_ingest_token: str | None = None
+    api_key: str | None = None
 
 
 @lru_cache(maxsize=1)
