@@ -26,7 +26,7 @@ This project was built with AI-assisted implementation under a specific
 review discipline — plan review before multi-file changes, verbatim
 diff review before every commit, corrections surfaced as their own
 reviewable item rather than folded silently into the next one. See
-[`docs/how-this-was-built.md`](docs/how-this-was-built.md) for the
+[`how-this-was-built.md`](how-this-was-built.md) for the
 actual mechanics, with real examples from this repo's own commit
 history.
 
