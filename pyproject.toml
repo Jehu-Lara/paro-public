@@ -49,16 +49,6 @@ packages = ["src/paro"]
 # uno gestionado por uv. Ver docs/adr/0001-python-314.md.
 python-preference = "system"
 
-[dependency-groups]
-dev = [
-    "pytest>=8.4",
-    "pytest-cov>=7.0",
-    "httpx2>=0.29",
-    "ruff>=0.14",
-    "mypy>=1.18",
-    "tzdata>=2026.1; sys_platform == 'win32'",
-]
-
 [tool.ruff]
 line-length = 100
 src = ["src", "tests", "alembic"]
