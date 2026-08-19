@@ -4,6 +4,9 @@ PBIP project (`dashboard_oee.pbip`) connecting to the two Neon analytics
 views (`fact_downtime_event`, `production_record`) that `docs/analytics.md`
 documents. Open `dashboard_oee.pbip` in Power BI Desktop.
 
+See [`docs/how-this-was-built.md`](../docs/how-this-was-built.md) for how
+this project (including this dashboard) was built and reviewed.
+
 ## Applying `paro-theme.json`
 
 **View → Themes → Browse for themes...** → select `paro-theme.json`.

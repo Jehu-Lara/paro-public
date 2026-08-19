@@ -20,6 +20,18 @@ analytics schema connectable to Power BI.
 
 ---
 
+## How this was built
+
+This project was built with AI-assisted implementation under a specific
+review discipline — plan review before multi-file changes, verbatim
+diff review before every commit, corrections surfaced as their own
+reviewable item rather than folded silently into the next one. See
+[`docs/how-this-was-built.md`](docs/how-this-was-built.md) for the
+actual mechanics, with real examples from this repo's own commit
+history.
+
+---
+
 ## Live demo
 
 API: <https://paro-public.onrender.com> · docs: <https://paro-public.onrender.com/docs>
@@ -75,7 +87,8 @@ Deliberate decisions, documented in `docs/adr/`. Listed here so the project
 |---|---|
 | `GET /losses/pareto` as a REST endpoint | The SQL view already serves the same data to Power BI |
 | Physical date table | Power BI generates it with `CALENDARAUTO()` |
-| AI/LLM, frontend, authentication, sensors, MES | Out of scope by design |
+| AI/LLM, frontend, sensors, MES | Out of scope by design |
+| User accounts, JWT/OAuth, RBAC | Out of scope by design — see [ADR 0005](docs/adr/0005-optional-api-key-authentication.md) for what *is* built (an optional API key) and why a full authz system isn't |
 
 ## Requirements
 
@@ -123,9 +136,14 @@ open events) is documented in `docs/oee-definition.md`.
 ## Limitations
 
 - Demo data is **synthetic** and marked as such.
-- No authentication: the service is meant to run on an internal network.
-  `POST`/`PATCH` write endpoints are excluded from CORS (browser JS on
-  another origin can't call them); reads (`GET`) are open to any origin.
+- Authentication is optional and off by default: `POST`/`PATCH` write
+  endpoints accept an `X-API-Key` header, checked against `PARO_API_KEY`
+  only when that variable is set — unset (the default, including on the
+  live demo above) means every write endpoint behaves exactly as it does
+  today. See [ADR 0005](docs/adr/0005-optional-api-key-authentication.md).
+  `POST`/`PATCH` are also excluded from CORS (browser JS on another
+  origin can't call them) independent of the key; reads (`GET`) are open
+  to any origin.
 - Shifts are modeled as concrete instances, not recurrence rules.
 
 ## Roadmap
