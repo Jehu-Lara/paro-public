@@ -3,6 +3,22 @@
 - **Status:** proposed
 - **Date:** 2026-08-16
 
+## Revision (2026-08-16)
+
+Still status "proposed" (no simulator code exists yet), amended in place
+rather than superseded by a new ADR. Verifying the actual schema, API
+validators, and analytics views before any code was written (see the
+implementation notes accompanying this revision) surfaced that the original
+**"one thread per machine"** concurrency model contradicts reproducibility
+and buys nothing here — see "Simulator architecture" below for the
+replacement (sequential generation with per-machine RNG substreams,
+concurrent HTTP transport) and the reasoning. This revision also adds the
+core/driver logical-clock design and softens the "inherits validation for
+free" consequence. The write-rate arithmetic, RNG-substream mechanics, and
+the two-tier QA check design surfaced by that same verification belong in
+an implementation spec, not this ADR — see the accompanying report for why
+that spec isn't written yet.
+
 ## Revision (2026-08-18)
 
 Still status "proposed". Amended in place again, same pattern as the
@@ -58,12 +74,53 @@ source code is written as part of this decision.
 
 ### Simulator architecture
 
-- **Concurrency model:** one lightweight thread (or async task) per
-  simulated machine, each independently advancing its own state machine
-  (`running` → `micro_stop` / `failure` → `running`) and writing
-  `production_record` / `downtime_event` rows through the existing API
-  client, not direct DB writes — this keeps the simulator exercising the same
-  validation path real integrations would use.
+- **Logical clock — core generator vs. live driver (supersedes nothing,
+  resolves a tension in Context above):** the simulator core is a pure
+  generator: `(config, seed, start, end) -> events`, where each event carries
+  a *virtual* timestamp. No sleeps, no I/O, no network inside the core — 14
+  simulated days across 8 machines generates in seconds. This is what makes
+  the QA Agent's 5-round cap viable at all against a multi-day acceptance
+  run.
+
+  Context (above) describes "continuous load... over time," which reads like
+  a live, real-time feed. That's not a second architecture — it's a thin
+  *driver* over the same core: an optional live mode maps virtual time to
+  wall-clock time with a speed factor (e.g. `--speed 60` => 1 real minute =
+  1 simulated hour) and sleeps there, outside the core. The core's boundary
+  is drawn so adding that driver later needs zero core changes. Backfill
+  (generate 14 days of virtual timestamps in the past, transport them now) is
+  the *general* case this core supports directly; live mode is a later,
+  optional wrapper, not the starting point.
+
+- **Concurrency model — supersedes the original "one thread per machine"
+  design (see Revision, above):** a shared-RNG, multi-threaded generator is
+  not reproducible — with threads sharing an RNG, scheduler interleaving
+  decides which draw each machine receives, and interleaving isn't
+  deterministic. Threads also model contention that doesn't exist here: in
+  this spec, machines are fully independent — none consumes another's
+  output. Replaced with two separate concerns:
+  - **Generation:** sequential per machine, each machine driven by its own
+    RNG substream derived deterministically from the master seed, so
+    machine *N*'s output never depends on what any other machine generated.
+    This also means a single machine's output can be regenerated in
+    isolation for debugging, without replaying the rest.
+  - **Transport:** concurrent HTTP writes via a bounded worker pool over
+    already-generated batches, through the existing API client (not direct
+    DB writes, so the simulator exercises the same validation path real
+    integrations would use). Concurrency belongs at this layer, where it's
+    actually needed (network latency) and is safe because `external_id` is
+    deterministic per event — arrival order at the API cannot change the
+    result.
+
+  **Determinism applies to the generated event stream, not to the
+  database:** same seed + same config yields the same canonical sequence of
+  generated events (same order, same values) — verifiable by hashing a
+  canonical dump of the generator's output *before* transport. Because
+  transport is concurrent, DB insertion order, autoincrement ids, and
+  `created_at` legitimately vary run to run even with an identical seed; the
+  database is verified by row counts and invariants, never by byte-for-byte
+  equality against a prior run.
+
 - **Statistical noise injection:** cycle times drawn from a distribution
   centered on each machine's `ideal_cycle_time_seconds` (e.g. a truncated
   normal, to avoid negative cycles) rather than a fixed value; micro-stops
@@ -155,13 +212,25 @@ one-time build tool, not a production runtime component.
   separate, later task.
 - The QA Agent's checks (constraint validity + distributional plausibility)
   need to be defined precisely enough to be machine-checkable before the
-  Developer Agent can be run against them — that concrete spec (target
-  failure rates, micro-stop duration ranges, scrap rates, round cap) is not
-  fixed by this ADR and must be settled before implementation starts.
+  Developer Agent can be run against them — that concrete spec (clock
+  model, determinism contract, RNG substreams, statistical parameters,
+  rate-limit strategy, two-tier check design) is not fixed by this ADR; see
+  [`docs/simulator-spec.md`](../simulator-spec.md), which must be reviewed
+  and confirmed before implementation starts. A batch/bulk ingest endpoint
+  (`POST /downtime-events/batch` or similar) was identified there as the
+  correct long-term fix for write-volume/rate-limit pressure on real
+  ingestion, not just the simulator — named as a **deferred** future option,
+  not built as part of this work.
 - Choosing LangGraph ties the build tooling to that library and, if used,
   an Ollama-served local model; neither is a runtime dependency of the PARO
   backend or API — this is tooling used once to produce the simulator
   script, not a component the deployed service depends on.
-- The simulator itself writes through the existing API client, so it
-  inherits any future API validation changes for free — no dedicated
-  simulator-side compatibility layer is needed.
+- The simulator itself writes through the existing API client, so
+  inheriting the API's validation cuts both ways: it inherits any *future*
+  validation change for free with no dedicated simulator-side compatibility
+  layer, but it also inherits *today's* validations exactly as they stand —
+  which were never written with a 14-day backfill in mind, since nothing in
+  the schema or API previously needed to reject or accept old timestamps on
+  purpose (see the verification notes on this ADR's revision). A validation
+  rule added later specifically to reject old data would block the
+  simulator too, not just real integrations.
