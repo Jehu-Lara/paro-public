@@ -4,6 +4,8 @@ Sprint 3 adds the domain endpoints (``downtime-events``,
 ``production-records``, ``oee``) on top of Sprint 0's skeleton.
 """
 
+import logging
+import time
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -13,6 +15,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
+from starlette.middleware.base import RequestResponseEndpoint
 
 from paro import __version__
 from paro.api.errors import register_exception_handlers
@@ -21,12 +24,45 @@ from paro.api.routers.downtime import router as downtime_router
 from paro.api.routers.oee import router as oee_router
 from paro.api.routers.production import router as production_router
 from paro.db.session import get_session_local
+from paro.logging_config import configure_logging
+
+configure_logging()
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="PARO",
     version=__version__,
     summary="Downtime capture and deterministic OEE calculation for a production line.",
 )
+
+
+@app.middleware("http")
+async def _log_requests(request: Request, call_next: RequestResponseEndpoint) -> Response:
+    """Logs one structured line per request -- every request, including
+    GET /health: nothing currently pings it on a schedule (no orchestrator,
+    no configured uptime monitor -- the Render free tier only spins down
+    from idling, per the README), so there's no polling noise to exclude
+    yet, and a single uniform code path is simpler than a path exclusion.
+
+    ``extra`` is a fixed allowlist only -- method/path/status_code/
+    duration_ms/client host. Never request.headers, never Authorization or
+    X-API-Key, never the Request object itself: those must never reach the
+    log output, structured or not.
+    """
+    start = time.perf_counter()
+    response = await call_next(request)
+    duration_ms = (time.perf_counter() - start) * 1000
+    logger.info(
+        "request",
+        extra={
+            "method": request.method,
+            "path": request.url.path,
+            "status_code": response.status_code,
+            "duration_ms": round(duration_ms, 2),
+            "client": request.client.host if request.client else None,
+        },
+    )
+    return response
 
 
 def _handle_rate_limit_exceeded(request: Request, exc: Exception) -> Response:
