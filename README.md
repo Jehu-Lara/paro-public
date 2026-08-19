@@ -1,5 +1,9 @@
 # PARO
 
+[![CI](https://img.shields.io/github/actions/workflow/status/Jehu-Lara/paro-public/ci.yml?branch=main&label=CI)](https://github.com/Jehu-Lara/paro-public/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/github/license/Jehu-Lara/paro-public)](LICENSE)
+![Python 3.14](https://img.shields.io/badge/python-3.14-blue)
+
 Operational data platform for manufacturing: captures line downtime events and
 production records, calculates **OEE** deterministically and auditably, and exposes an
 analytics schema connectable to Power BI.
