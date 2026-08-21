@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 import httpx2
 
 from paro.db.session import get_session_local
-from scripts.simulate_production import _resolve_reason_ids, _resolve_topology
+from scripts.simulate_production import _ensure_reason_catalog, _resolve_topology
 from scripts.simulator.client import (
     API_KEY_ENV_VAR,
     REQUEST_TIMEOUT_SECONDS,
@@ -46,7 +46,7 @@ def main(argv: list[str] | None = None) -> int:
         config = SimulatorConfig(
             lines=lines,
             machines=machines,
-            reason_ids=_resolve_reason_ids(session),
+            reason_ids=_ensure_reason_catalog(session),
         )
         plan = build_rolling_plan(session, config, now=datetime.now(UTC))
 

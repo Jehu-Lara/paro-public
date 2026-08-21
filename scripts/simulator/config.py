@@ -121,3 +121,17 @@ REASON_CODES_BY_MICRO_STOP_CLASS: dict[str, str] = {
     "starvation": REASON_MICRO_STOP_STARVATION_CODE,
     "minor_adjustment": REASON_MICRO_STOP_MINOR_ADJUSTMENT_CODE,
 }
+
+# Catalog rows required by every simulator run. Keeping their labels and
+# planned/unplanned classification beside the canonical codes prevents the
+# production bootstrap and the development seed from drifting apart.
+REQUIRED_REASON_CATALOG: dict[str, tuple[str, bool]] = {
+    REASON_PLANNED_CHANGEOVER_CODE: ("Cambio de formato", True),
+    REASON_FAILURE_MECHANICAL_CODE: ("Falla mecanica", False),
+    REASON_FAILURE_ELECTRICAL_CODE: ("Falla electrica", False),
+    REASON_FAILURE_PNEUMATIC_CODE: ("Falla neumatica", False),
+    REASON_FAILURE_SENSOR_CODE: ("Falla de sensor", False),
+    REASON_MICRO_STOP_MATERIAL_JAM_CODE: ("Atasco de material", False),
+    REASON_MICRO_STOP_STARVATION_CODE: ("Desabasto de material", False),
+    REASON_MICRO_STOP_MINOR_ADJUSTMENT_CODE: ("Ajuste menor", False),
+}

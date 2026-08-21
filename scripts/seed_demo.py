@@ -29,6 +29,7 @@ from paro.db.models import (
 )
 from paro.db.repositories import create_downtime_event, create_production_record
 from paro.db.session import get_session_local
+from scripts.simulator.config import REASON_FAILURE_MECHANICAL_CODE, REQUIRED_REASON_CATALOG
 
 __all__ = ["main", "run"]
 
@@ -38,14 +39,7 @@ LINE_CODE = "L1"
 MACHINE_CODE_1 = "M1"
 MACHINE_CODE_2 = "M2"
 REASON_PLANNED_CODE = "MTN-P"
-REASON_UNPLANNED_CODE = "FLA-M"
-REASON_PLANNED_CHANGEOVER_CODE = "CHG-P"
-REASON_FAILURE_ELECTRICAL_CODE = "FLA-E"
-REASON_FAILURE_PNEUMATIC_CODE = "FLA-N"
-REASON_FAILURE_SENSOR_CODE = "FLA-S"
-REASON_MICRO_STOP_MATERIAL_JAM_CODE = "ATC-M"
-REASON_MICRO_STOP_STARVATION_CODE = "DES-M"
-REASON_MICRO_STOP_MINOR_ADJUSTMENT_CODE = "AJT-M"
+REASON_UNPLANNED_CODE = REASON_FAILURE_MECHANICAL_CODE
 SHIFT_CODE = "T1"
 
 # El turno cruza medianoche a proposito: 2026-08-10 22:00 UTC -> 2026-08-11 06:00 UTC.
@@ -163,22 +157,11 @@ def run(session: Session) -> dict[str, int]:
     reason_planned = _get_or_create_reason(
         session, REASON_PLANNED_CODE, "Mantenimiento planeado", True
     )
-    reason_unplanned = _get_or_create_reason(
-        session, REASON_UNPLANNED_CODE, "Falla mecanica", False
-    )
-    # Las 7 filas siguientes completan el catalogo que necesita el reason mix
-    # del simulador (docs/simulator-spec.md 4.6): FLA-M ya cubre "mechanical"
-    # (clase failure); CHG-P es un motivo planeado propio, distinto de MTN-P
-    # a proposito (mantenimiento vs. cambio de formato/producto).
-    _get_or_create_reason(session, REASON_PLANNED_CHANGEOVER_CODE, "Cambio de formato", True)
-    _get_or_create_reason(session, REASON_FAILURE_ELECTRICAL_CODE, "Falla electrica", False)
-    _get_or_create_reason(session, REASON_FAILURE_PNEUMATIC_CODE, "Falla neumatica", False)
-    _get_or_create_reason(session, REASON_FAILURE_SENSOR_CODE, "Falla de sensor", False)
-    _get_or_create_reason(session, REASON_MICRO_STOP_MATERIAL_JAM_CODE, "Atasco de material", False)
-    _get_or_create_reason(
-        session, REASON_MICRO_STOP_STARVATION_CODE, "Desabasto de material", False
-    )
-    _get_or_create_reason(session, REASON_MICRO_STOP_MINOR_ADJUSTMENT_CODE, "Ajuste menor", False)
+    simulator_reasons = {
+        code: _get_or_create_reason(session, code, name, default_is_planned)
+        for code, (name, default_is_planned) in REQUIRED_REASON_CATALOG.items()
+    }
+    reason_unplanned = simulator_reasons[REASON_UNPLANNED_CODE]
     _get_or_create_shift(session, line)
 
     _, was_created_first = create_downtime_event(

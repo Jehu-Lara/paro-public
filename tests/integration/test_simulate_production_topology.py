@@ -9,13 +9,14 @@ from scripts.simulate_production import (
     _REQUIRED_REASON_CODES,
     LINE_CODES,
     MACHINE_CODES_PER_LINE,
+    _ensure_reason_catalog,
     _resolve_reason_ids,
     _resolve_topology,
 )
 from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
-from paro.db.models import Machine, ProductionLine
+from paro.db.models import DowntimeReason, Machine, ProductionLine
 
 
 def test_resolve_topology_creates_two_lines_of_four_machines(migrated_engine: Engine) -> None:
@@ -67,3 +68,44 @@ def test_resolve_reason_ids_returns_partial_mapping_when_catalog_missing(
         reason_ids = _resolve_reason_ids(session)
 
     assert reason_ids == {}
+
+
+def test_ensure_reason_catalog_populates_an_empty_catalog(migrated_engine: Engine) -> None:
+    with Session(migrated_engine) as session:
+        reason_ids = _ensure_reason_catalog(session)
+
+    assert set(reason_ids) == set(_REQUIRED_REASON_CODES)
+    assert all(isinstance(reason_id, int) for reason_id in reason_ids.values())
+
+
+def test_ensure_reason_catalog_seeds_only_missing_rows_and_is_idempotent(
+    migrated_engine: Engine,
+) -> None:
+    with Session(migrated_engine) as session:
+        existing = DowntimeReason(
+            code="FLA-M",
+            name="Existing production label",
+            default_is_planned=False,
+        )
+        session.add(existing)
+        session.commit()
+        existing_id = existing.id
+
+        first = _ensure_reason_catalog(session)
+        second = _ensure_reason_catalog(session)
+
+        rows = session.execute(
+            select(
+                DowntimeReason.id,
+                DowntimeReason.code,
+                DowntimeReason.name,
+                DowntimeReason.default_is_planned,
+            ).where(DowntimeReason.code.in_(_REQUIRED_REASON_CODES))
+        ).all()
+
+    assert first == second
+    assert set(first) == set(_REQUIRED_REASON_CODES)
+    assert len(rows) == len(_REQUIRED_REASON_CODES)
+    assert first["FLA-M"] == existing_id
+    assert next(row.name for row in rows if row.code == "FLA-M") == "Existing production label"
+    assert next(row.default_is_planned for row in rows if row.code == "CHG-P") is True

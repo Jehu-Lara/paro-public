@@ -34,9 +34,7 @@ from paro.db.session import get_engine, get_session_local
 from scripts.simulator.client import API_KEY_ENV_VAR, TRUSTED_INGEST_TOKEN_ENV_VAR
 from scripts.simulator.config import (
     MASTER_SEED,
-    REASON_CODES_BY_FAILURE_CLASS,
-    REASON_CODES_BY_MICRO_STOP_CLASS,
-    REASON_PLANNED_CHANGEOVER_CODE,
+    REQUIRED_REASON_CATALOG,
 )
 from scripts.simulator.generator import generate
 from scripts.simulator.model import LineConfig, MachineConfig, SimulatorConfig
@@ -48,11 +46,7 @@ LINE_CODES = ("SIM-L1", "SIM-L2")
 MACHINE_CODES_PER_LINE = ("M1", "M2", "M3", "M4")
 DEFAULT_IDEAL_CYCLE_TIME_SECONDS = Decimal("30.000")
 
-_REQUIRED_REASON_CODES = frozenset(
-    {REASON_PLANNED_CHANGEOVER_CODE}
-    | set(REASON_CODES_BY_FAILURE_CLASS.values())
-    | set(REASON_CODES_BY_MICRO_STOP_CLASS.values())
-)
+_REQUIRED_REASON_CODES = frozenset(REQUIRED_REASON_CATALOG)
 
 
 def _get_or_create_line(session: Session, code: str) -> ProductionLine:
@@ -101,18 +95,35 @@ def _resolve_topology(session: Session) -> tuple[tuple[LineConfig, ...], tuple[M
 
 
 def _resolve_reason_ids(session: Session) -> dict[str, int]:
-    """Queries existing downtime_reason rows by code -- does not seed them.
-
-    scripts/seed_demo.py already seeds the full catalog (simulator-spec.md
-    4.6). If a required code is missing here, generate()'s own _validate()
-    raises a clear ValueError; this function doesn't duplicate that check.
-    """
+    """Query existing simulator ``downtime_reason`` rows without mutating them."""
     rows = session.execute(
         select(DowntimeReason.code, DowntimeReason.id).where(
             DowntimeReason.code.in_(_REQUIRED_REASON_CODES)
         )
     ).all()
     return {code: reason_id for code, reason_id in rows}
+
+
+def _ensure_reason_catalog(session: Session) -> dict[str, int]:
+    """Create only missing simulator catalog rows and return every required id.
+
+    The operation is idempotent by ``downtime_reason.code``. It deliberately
+    does not call ``seed_demo.run`` because that development seed also writes
+    historical shifts, production records, and downtime events.
+    """
+    reason_ids = _resolve_reason_ids(session)
+    for code in sorted(_REQUIRED_REASON_CODES - set(reason_ids)):
+        name, default_is_planned = REQUIRED_REASON_CATALOG[code]
+        reason = DowntimeReason(
+            code=code,
+            name=name,
+            default_is_planned=default_is_planned,
+        )
+        session.add(reason)
+        session.flush()
+        reason_ids[code] = reason.id
+    session.commit()
+    return reason_ids
 
 
 def _parse_tz_aware_datetime(value: str) -> datetime:
@@ -147,7 +158,7 @@ def main(argv: list[str] | None = None) -> int:
 
     with get_session_local()() as session:
         lines, machines = _resolve_topology(session)
-        reason_ids = _resolve_reason_ids(session)
+        reason_ids = _ensure_reason_catalog(session)
 
     config = SimulatorConfig(lines=lines, machines=machines, reason_ids=reason_ids)
     run = generate(config, args.seed, args.start, args.end)
