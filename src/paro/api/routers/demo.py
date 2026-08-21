@@ -14,7 +14,7 @@ from typing import Literal
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -69,6 +69,12 @@ def demo_page() -> FileResponse:
     return FileResponse(_WEB_ROOT / "demo.html", media_type="text/html")
 
 
+@router.get("/", include_in_schema=False)
+def demo_redirect() -> RedirectResponse:
+    """Make the public Render hostname land on the read-only demo."""
+    return RedirectResponse(url="/demo", status_code=307)
+
+
 @router.get("/demo-assets/demo.css", include_in_schema=False)
 def demo_css() -> FileResponse:
     return FileResponse(_WEB_ROOT / "demo.css", media_type="text/css")
@@ -99,7 +105,13 @@ def demo_overview(db: Session = Depends(get_db)) -> DemoOverviewResponse:  # noq
             raise _demo_unavailable()
 
         shift_code, window = _completed_shift_window(data_through, line.timezone)
-        snapshot = query_line_oee(db, line_id=line.id, start=window.start, end=window.end)
+        snapshot = query_line_oee(
+            db,
+            line_id=line.id,
+            start=window.start,
+            end=window.end,
+            source=settings.demo_source,
+        )
         reason_ids = {event.reason_id for event in snapshot.downtime_events}
         reason_rows = (
             db.execute(

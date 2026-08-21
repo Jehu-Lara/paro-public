@@ -101,7 +101,7 @@ def generate(
     end: datetime,
     *,
     source: str = SOURCE,
-    id_namespace: str = "sim-v2",
+    id_namespace: str | None = None,
 ) -> GeneratedRun:
     _validate(config, start, end)
 
@@ -233,7 +233,7 @@ def _simulate_machine(
     start: datetime,
     end: datetime,
     source: str,
-    id_namespace: str,
+    id_namespace: str | None,
 ) -> tuple[list[DowntimeEventDraft], list[_Cycle]]:
     events: list[DowntimeEventDraft] = []
     cycles: list[_Cycle] = []
@@ -254,8 +254,12 @@ def _simulate_machine(
                 operator_note=None,
                 source=source,
                 external_id=(
-                    f"{id_namespace}:machine:{machine.machine_id}:event:"
-                    f"{_absolute_id_timestamp(started_at)}:{event_index}"
+                    f"sim-{machine.machine_id}-{event_index}"
+                    if id_namespace is None
+                    else (
+                        f"{id_namespace}:machine:{machine.machine_id}:event:"
+                        f"{_absolute_id_timestamp(started_at)}:{event_index}"
+                    )
                 ),
             )
         )
@@ -369,7 +373,7 @@ def _bucket_line(
     end: datetime,
     *,
     source: str,
-    id_namespace: str,
+    id_namespace: str | None,
 ) -> list[ProductionRecordDraft]:
     bucket_seconds = PRODUCTION_BUCKET_MINUTES * 60
     num_buckets = int((end - start).total_seconds() // bucket_seconds)
@@ -397,8 +401,12 @@ def _bucket_line(
                 ideal_cycle_time_seconds=line.ideal_cycle_time_seconds,
                 source=source,
                 external_id=(
-                    f"{id_namespace}:line:{line.line_id}:bucket:"
-                    f"{_absolute_id_timestamp(bucket_start)}"
+                    f"sim-line{line.line_id}-{index}"
+                    if id_namespace is None
+                    else (
+                        f"{id_namespace}:line:{line.line_id}:bucket:"
+                        f"{_absolute_id_timestamp(bucket_start)}"
+                    )
                 ),
             )
         )

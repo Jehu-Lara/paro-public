@@ -10,7 +10,13 @@ credentials.
 - Health check: `/health`
 - Public: `/health`, `/ready`, `/docs`, `/api/v1/oee`,
   `/api/v1/demo/overview`, `/demo`
-- Secrets: `PARO_DATABASE_URL`, `PARO_API_KEY`
+- Secrets: `PARO_DATABASE_URL`, `PARO_API_KEY`,
+  `PARO_TRUSTED_INGEST_TOKEN`
+
+The web service must hold the trusted-ingest token because it verifies the
+cron's `X-Paro-Trusted-Ingest` header before granting the rate-limit
+exemption. The API key and trusted-ingest token are independent values; each
+value must match its counterpart on the cron.
 
 ## Cron
 
@@ -33,3 +39,12 @@ assets, screenshots, or Git history.
 5. Run once manually, then enable the schedule.
 6. Observe two consecutive runs and reconcile API, database, dashboard, and
    logs before calling the feed ready.
+
+## Historical simulator compatibility
+
+The original `simulator` source retains its legacy relative external IDs so a
+rerun conflicts with or reuses the historical `(source, external_id)` keys
+instead of silently inserting a second copy. Absolute IDs are opt-in through
+an explicit namespace and are mandatory for the rolling source
+`simulator-live-v1`. Do not mix historical and live sources in one analytical
+query.

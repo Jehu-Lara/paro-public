@@ -6,6 +6,7 @@ between tests; the formatter is the actual unit under test.
 
 import json
 import logging
+import sys
 
 from paro.logging_config import JsonFormatter
 
@@ -34,6 +35,13 @@ def test_format_produces_valid_json_with_expected_keys() -> None:
     assert parsed["message"] == "request"
     assert "timestamp" in parsed
     assert "exception" not in parsed
+
+    try:
+        raise ValueError("formatter-branch")
+    except ValueError:
+        exception_record = _make_record(exc_info=sys.exc_info())
+    exception_parsed = json.loads(JsonFormatter().format(exception_record))
+    assert "ValueError: formatter-branch" in exception_parsed["exception"]
 
 
 def test_format_includes_extra_fields() -> None:

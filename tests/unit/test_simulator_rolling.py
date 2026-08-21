@@ -3,11 +3,17 @@
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
-from scripts.simulator.config import LIVE_SOURCE
+from scripts.simulator.config import LIVE_ID_NAMESPACE, LIVE_SOURCE
 from scripts.simulator.generator import generate
-from scripts.simulator.model import LineConfig, MachineConfig, SimulatorConfig
+from scripts.simulator.model import (
+    DowntimeEventDraft,
+    LineConfig,
+    MachineConfig,
+    SimulatorConfig,
+)
 from scripts.simulator.rolling import (
     CATCH_UP_HOURS,
+    _event_intersects_window,
     build_rolling_plan,
     daily_seed,
     latest_closed_bucket,
@@ -57,8 +63,22 @@ def test_adjacent_generator_windows_have_no_external_id_collisions() -> None:
     session, config = _database()
     try:
         start = datetime(2026, 8, 20, 12, 0, tzinfo=UTC)
-        first = generate(config, 42, start, start + timedelta(minutes=15))
-        second = generate(config, 42, start + timedelta(minutes=15), start + timedelta(minutes=30))
+        first = generate(
+            config,
+            42,
+            start,
+            start + timedelta(minutes=15),
+            source=LIVE_SOURCE,
+            id_namespace=LIVE_ID_NAMESPACE,
+        )
+        second = generate(
+            config,
+            42,
+            start + timedelta(minutes=15),
+            start + timedelta(minutes=30),
+            source=LIVE_SOURCE,
+            id_namespace=LIVE_ID_NAMESPACE,
+        )
         first_ids = {item.external_id for item in first.production_records} | {
             item.external_id for item in first.downtime_events
         }
@@ -66,6 +86,8 @@ def test_adjacent_generator_windows_have_no_external_id_collisions() -> None:
             item.external_id for item in second.downtime_events
         }
         assert first_ids.isdisjoint(second_ids)
+        legacy = generate(config, 42, start, start + timedelta(minutes=15))
+        assert legacy.production_records[0].external_id.startswith("sim-line")
     finally:
         session.close()
 
@@ -118,20 +140,63 @@ def test_old_live_row_marks_gap_beyond_catch_up_horizon() -> None:
     try:
         now = datetime(2026, 8, 20, 18, 7, tzinfo=UTC)
         old_start = now - timedelta(hours=CATCH_UP_HOURS + 2)
-        line_id = config.lines[0].line_id
-        session.add(
-            ProductionRecord(
-                line_id=line_id,
-                interval_start=old_start,
-                interval_end=old_start + timedelta(minutes=15),
-                total_count=1,
-                good_count=1,
-                ideal_cycle_time_seconds=Decimal("30.000"),
-                source=LIVE_SOURCE,
-                external_id="old-live-row",
-            )
+        current_line_id = config.lines[0].line_id
+        second_line = ProductionLine(code="SIM-L2", name="SIM-L2", timezone="America/Monterrey")
+        session.add(second_line)
+        session.flush()
+        second_machine = Machine(line_id=second_line.id, code="M2", name="SIM-L2 M1")
+        session.add(second_machine)
+        session.flush()
+        two_line_config = SimulatorConfig(
+            lines=(config.lines[0], LineConfig(second_line.id, Decimal("30.000"))),
+            machines=(
+                config.machines[0],
+                MachineConfig(second_machine.id, second_line.id),
+            ),
+            reason_ids=config.reason_ids,
+        )
+        session.add_all(
+            [
+                ProductionRecord(
+                    line_id=second_line.id,
+                    interval_start=old_start,
+                    interval_end=old_start + timedelta(minutes=15),
+                    total_count=1,
+                    good_count=1,
+                    ideal_cycle_time_seconds=Decimal("30.000"),
+                    source=LIVE_SOURCE,
+                    external_id="old-live-row",
+                ),
+                ProductionRecord(
+                    line_id=current_line_id,
+                    interval_start=now - timedelta(minutes=30),
+                    interval_end=now - timedelta(minutes=15),
+                    total_count=1,
+                    good_count=1,
+                    ideal_cycle_time_seconds=Decimal("30.000"),
+                    source=LIVE_SOURCE,
+                    external_id="current-live-row",
+                ),
+            ]
         )
         session.commit()
-        assert build_rolling_plan(session, config, now=now).gap_detected is True
+        assert build_rolling_plan(session, two_line_config, now=now).gap_detected is True
+
+        crossing = DowntimeEventDraft(
+            line_id=current_line_id,
+            machine_id=config.machines[0].machine_id,
+            started_at=old_start,
+            ended_at=old_start + timedelta(hours=3),
+            reason_id=next(iter(config.reason_ids.values())),
+            is_planned=False,
+            operator_note=None,
+            source=LIVE_SOURCE,
+            external_id="crossing-horizon",
+        )
+        assert _event_intersects_window(
+            crossing,
+            horizon_start=now - timedelta(hours=CATCH_UP_HOURS),
+            cutoff=now,
+        )
     finally:
         session.close()

@@ -19,7 +19,7 @@ from scripts.simulator.config import (
     SHIFT_TIMEZONE,
 )
 from scripts.simulator.generator import generate
-from scripts.simulator.model import GeneratedRun, SimulatorConfig
+from scripts.simulator.model import DowntimeEventDraft, GeneratedRun, SimulatorConfig
 
 __all__ = [
     "CATCH_UP_HOURS",
@@ -109,6 +109,12 @@ def _day_runs(
     return tuple(runs)
 
 
+def _event_intersects_window(
+    event: DowntimeEventDraft, *, horizon_start: datetime, cutoff: datetime
+) -> bool:
+    return event.started_at < cutoff and (event.ended_at is None or event.ended_at > horizon_start)
+
+
 def build_rolling_plan(
     session: Session,
     config: SimulatorConfig,
@@ -135,7 +141,7 @@ def build_rolling_plan(
         event
         for run in runs
         for event in run.downtime_events
-        if event.started_at >= horizon_start and event.started_at < cutoff
+        if _event_intersects_window(event, horizon_start=horizon_start, cutoff=cutoff)
     )
 
     production_ids = [record.external_id for record in production]
@@ -190,12 +196,19 @@ def build_rolling_plan(
                 )
             )
 
-    latest_existing = session.scalar(
-        select(func.max(ProductionRecord.interval_end)).where(
-            ProductionRecord.source == LIVE_SOURCE
-        )
+    latest_by_line: dict[int, datetime] = {
+        line_id: latest
+        for line_id, latest in session.execute(
+            select(ProductionRecord.line_id, func.max(ProductionRecord.interval_end))
+            .where(ProductionRecord.source == LIVE_SOURCE)
+            .group_by(ProductionRecord.line_id)
+        ).tuples()
+        if latest is not None
+    }
+    gap_detected = bool(latest_by_line) and any(
+        latest_by_line.get(line.line_id) is None or latest_by_line[line.line_id] < horizon_start
+        for line in config.lines
     )
-    gap_detected = latest_existing is not None and latest_existing < horizon_start
     return RollingPlan(
         cutoff=cutoff,
         horizon_start=horizon_start,

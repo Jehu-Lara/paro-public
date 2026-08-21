@@ -48,23 +48,31 @@ def _ideal_time_total_seconds(records: list[ProductionRecord]) -> Decimal:
 
 
 def query_line_oee(
-    session: Session, *, line_id: int, start: datetime, end: datetime
+    session: Session,
+    *,
+    line_id: int,
+    start: datetime,
+    end: datetime,
+    source: str | None = None,
 ) -> OeeQueryResult:
-    """Loads one window and invokes the pure OEE engine exactly once."""
+    """Loads one window and invokes the pure OEE engine exactly once.
+
+    ``source`` is optional for the general OEE API and mandatory for bounded
+    views such as the public synthetic demo.
+    """
     window = Interval(start, end)
     line = session.get(ProductionLine, line_id)
     if line is None:
         raise LineNotFoundError(f"production line {line_id} not found")
 
-    downtime_events = list(
-        session.scalars(
-            select(DowntimeEvent).where(
-                DowntimeEvent.line_id == line_id,
-                DowntimeEvent.started_at < window.end,
-                (DowntimeEvent.ended_at.is_(None)) | (DowntimeEvent.ended_at > window.start),
-            )
-        ).all()
-    )
+    downtime_filters = [
+        DowntimeEvent.line_id == line_id,
+        DowntimeEvent.started_at < window.end,
+        (DowntimeEvent.ended_at.is_(None)) | (DowntimeEvent.ended_at > window.start),
+    ]
+    if source is not None:
+        downtime_filters.append(DowntimeEvent.source == source)
+    downtime_events = list(session.scalars(select(DowntimeEvent).where(*downtime_filters)).all())
     planned = [
         DowntimeSpan(start=event.started_at, end=event.ended_at)
         for event in downtime_events
@@ -76,15 +84,14 @@ def query_line_oee(
         if not event.is_planned
     ]
 
-    overlapping = list(
-        session.scalars(
-            select(ProductionRecord).where(
-                ProductionRecord.line_id == line_id,
-                ProductionRecord.interval_start < window.end,
-                ProductionRecord.interval_end > window.start,
-            )
-        ).all()
-    )
+    production_filters = [
+        ProductionRecord.line_id == line_id,
+        ProductionRecord.interval_start < window.end,
+        ProductionRecord.interval_end > window.start,
+    ]
+    if source is not None:
+        production_filters.append(ProductionRecord.source == source)
+    overlapping = list(session.scalars(select(ProductionRecord).where(*production_filters)).all())
     included = [
         record
         for record in overlapping

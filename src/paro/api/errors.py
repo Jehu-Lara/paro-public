@@ -12,6 +12,7 @@ import logging
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from paro.db.exceptions import DuplicateWithDifferentPayloadError, StaleUpdateError
 from paro.json_safe import json_safe
@@ -51,18 +52,40 @@ async def _stale_update_handler(request: Request, exc: Exception) -> JSONRespons
     )
 
 
-async def _generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    # Exception messages and tracebacks may contain SQL-bound values or other
-    # request-derived payload data.  Log only a fixed diagnostic allowlist.
-    logger.error(
-        "Unhandled exception",
-        extra={
-            "method": request.method,
-            "path": request.url.path,
-            "exception_type": type(exc).__name__,
-        },
-    )
-    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+class _UnhandledExceptionBoundary:
+    """Stops unhandled exceptions before an ASGI server can log their values."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
+        response_started = False
+
+        async def tracked_send(message: Message) -> None:
+            nonlocal response_started
+            if message.get("type") == "http.response.start":
+                response_started = True
+            await send(message)
+
+        try:
+            await self.app(scope, receive, tracked_send)
+        except Exception as exc:
+            logger.error(
+                "Unhandled exception",
+                extra={
+                    "method": scope.get("method"),
+                    "path": scope.get("path"),
+                    "exception_type": type(exc).__name__,
+                },
+            )
+            if not response_started:
+                response = JSONResponse(
+                    status_code=500, content={"detail": "Internal server error"}
+                )
+                await response(scope, receive, send)
 
 
 def register_exception_handlers(app: FastAPI) -> None:
@@ -71,4 +94,4 @@ def register_exception_handlers(app: FastAPI) -> None:
         DuplicateWithDifferentPayloadError, _duplicate_with_different_payload_handler
     )
     app.add_exception_handler(StaleUpdateError, _stale_update_handler)
-    app.add_exception_handler(Exception, _generic_exception_handler)
+    app.add_middleware(_UnhandledExceptionBoundary)

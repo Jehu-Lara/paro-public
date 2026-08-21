@@ -25,7 +25,9 @@ def test_generic_exception_log_excludes_exception_message_and_payload(
         raise RuntimeError("sensitive-payload-canary")
 
     register_exception_handlers(app)
-    response = TestClient(app, raise_server_exceptions=False).get("/explode")
+    # The default ``raise_server_exceptions=True`` proves the exception is
+    # consumed before it can escape to Uvicorn's error logger.
+    response = TestClient(app).get("/explode")
 
     assert response.status_code == 500
     assert response.json() == {"detail": "Internal server error"}

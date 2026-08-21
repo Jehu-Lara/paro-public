@@ -10,6 +10,8 @@ services:
         sync: false
       - key: PARO_API_KEY
         sync: false
+      - key: PARO_TRUSTED_INGEST_TOKEN
+        sync: false
       - key: PARO_ENV
         value: production
   - type: cron
