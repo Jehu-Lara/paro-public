@@ -22,6 +22,8 @@ value must match its counterpart on the cron.
 
 - Schedule: `*/15 * * * *`
 - Start: `python -m scripts.run_live_demo`
+- The first run idempotently creates only the simulator's missing downtime-reason
+  catalog rows; it does not execute the historical development seed.
 - Required: `PARO_DATABASE_URL`, `PARO_BASE_URL`, `PARO_API_KEY`,
   `PARO_TRUSTED_INGEST_TOKEN`
 - `PARO_API_KEY` authenticates writes. `PARO_TRUSTED_INGEST_TOKEN` only
