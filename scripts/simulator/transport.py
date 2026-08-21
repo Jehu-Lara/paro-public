@@ -71,6 +71,7 @@ def transport(
     *,
     base_url: str,
     max_workers: int = DEFAULT_MAX_WORKERS,
+    api_key: str | None = None,
     trusted_ingest_token: str | None = None,
     client: HttpClient | None = None,
 ) -> TransportResult:
@@ -101,6 +102,7 @@ def transport(
                 active_client,
                 base_url,
                 draft,
+                api_key=api_key,
                 trusted_ingest_token=trusted_ingest_token,
             ): draft
             for draft in run.production_records
@@ -111,6 +113,7 @@ def transport(
                 active_client,
                 base_url,
                 draft,
+                api_key=api_key,
                 trusted_ingest_token=trusted_ingest_token,
             ): draft
             for draft in run.downtime_events

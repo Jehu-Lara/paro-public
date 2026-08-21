@@ -1,0 +1,9 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.11.0/schema.json",
+  "name": "70a0b0c0d0e0f0011223",
+  "position": {"x": 820, "y": 278, "z": 7000, "height": 42, "width": 436, "tabOrder": 7000},
+  "visual": {
+    "visualType": "textbox",
+    "objects": {"general": [{"properties": {"paragraphs": [{"textRuns": [{"value": "SHIFT OUTPUT", "textStyle": {"fontFamily": "Segoe UI Semibold", "fontSize": "15px", "color": "#102540"}}], "horizontalTextAlignment": "left"}]}}]}
+  }
+}

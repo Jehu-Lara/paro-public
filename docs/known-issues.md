@@ -8,6 +8,8 @@ non-blocking, and what would resolve it.
 
 ## `GET /health` bypasses `Depends(get_db)`, colliding with `get_session_local()`'s process-wide cache on Windows
 
+- **Status:** resolved 2026-08-20.
+
 - **Discovered:** 2026-08-19, while adding `tests/integration/test_api_auth.py`.
 - **What:** `GET /health` (`src/paro/main.py`) calls `get_session_local()()`
   directly instead of going through the `Depends(get_db)` dependency every
@@ -34,8 +36,7 @@ non-blocking, and what would resolve it.
   Production deployments (Render + Neon, a long-lived connection, not a
   per-test temp file that gets deleted) aren't affected by this failure
   mode at all -- it's specific to test teardown on Windows.
-- **Resolution:** change `GET /health` to accept `db: Session =
-  Depends(get_db)` like every other endpoint, instead of calling
-  `get_session_local()()` directly. Not done as part of this session's
-  auth/logging work -- out of scope for that change, and the endpoint's
-  behavior is otherwise correct.
+- **Resolution:** `GET /health` now accepts `db: Session = Depends(get_db)`
+  like every other endpoint. A migrated-database integration test covers the
+  reachable case; a separate `/ready` endpoint returns 503 for dependency
+  failure while `/health` preserves its liveness-only 200 contract.

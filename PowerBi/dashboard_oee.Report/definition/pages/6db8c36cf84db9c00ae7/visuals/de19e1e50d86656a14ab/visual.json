@@ -92,13 +92,6 @@
       "dataPoint": [
         {
           "properties": {
-            "showAllDataPoints": {
-              "expr": {
-                "Literal": {
-                  "Value": "false"
-                }
-              }
-            },
             "fill": {
               "solid": {
                 "color": {

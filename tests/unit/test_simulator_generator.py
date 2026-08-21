@@ -20,6 +20,9 @@ from scripts.simulator.config import (
 from scripts.simulator.generator import generate
 from scripts.simulator.model import LineConfig, MachineConfig, SimulatorConfig
 
+from paro.domain.intervals import Interval
+from paro.domain.oee import DowntimeSpan, calculate_oee
+
 _REASON_IDS = {
     REASON_PLANNED_CHANGEOVER_CODE: 1,
     REASON_CODES_BY_FAILURE_CLASS["mechanical"]: 2,
@@ -138,6 +141,37 @@ def test_ideal_cycle_time_seconds_is_decimal_never_float() -> None:
 
     for record in run.production_records:
         assert isinstance(record.ideal_cycle_time_seconds, Decimal)
+
+
+def test_multimachine_line_is_compatible_with_line_grain_oee() -> None:
+    run = generate(_smoke_config(), seed=42, start=_START, end=_END)
+    total_count = sum(record.total_count for record in run.production_records)
+    good_count = sum(record.good_count for record in run.production_records)
+    ideal_time = sum(
+        (record.ideal_cycle_time_seconds * record.total_count for record in run.production_records),
+        Decimal("0"),
+    )
+    result = calculate_oee(
+        window=Interval(_START, _END),
+        planned_downtimes=[
+            DowntimeSpan(event.started_at, event.ended_at)
+            for event in run.downtime_events
+            if event.is_planned
+        ],
+        unplanned_downtimes=[
+            DowntimeSpan(event.started_at, event.ended_at)
+            for event in run.downtime_events
+            if not event.is_planned
+        ],
+        total_count=total_count,
+        good_count=good_count,
+        ideal_time_total_seconds=ideal_time,
+    )
+
+    assert result.performance_raw is not None
+    assert result.oee is not None
+    assert Decimal("0") < result.performance_raw <= Decimal("1")
+    assert Decimal("0") < result.oee <= Decimal("1")
 
 
 def test_missing_reason_code_raises_before_generation() -> None:

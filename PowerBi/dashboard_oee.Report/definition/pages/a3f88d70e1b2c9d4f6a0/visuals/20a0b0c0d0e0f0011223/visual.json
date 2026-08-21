@@ -1,0 +1,9 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.11.0/schema.json",
+  "name": "20a0b0c0d0e0f0011223",
+  "position": {"x": 24, "y": 70, "z": 2000, "height": 40, "width": 820, "tabOrder": 2000},
+  "visual": {
+    "visualType": "textbox",
+    "objects": {"general": [{"properties": {"paragraphs": [{"textRuns": [{"value": "Deterministic OEE from the PARO API · Import-mode analytical view", "textStyle": {"fontFamily": "Segoe UI", "fontSize": "13px", "color": "#51657A"}}], "horizontalTextAlignment": "left"}]}}]}
+  }
+}

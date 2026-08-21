@@ -8,11 +8,12 @@ Operational data platform for manufacturing: captures line downtime events and
 production records, calculates **OEE** deterministically and auditably, and exposes an
 analytics schema connectable to Power BI.
 
-> **Status: Sprint 4 - Part B complete (analytics views for Power BI).** The OEE
-> engine (Sprint 1), schema/migrations (Sprint 2), full HTTP API (Sprint 3), CI
-> validation against real PostgreSQL (Sprint 4 - Part A), and the two analytics
-> views `fact_downtime_event`/`fact_production_record` (Sprint 4 - Part B)
-> already exist. See [MVP scope](#mvp-scope) and
+> **Status: portfolio-readiness work in review.** The OEE engine, schema,
+> migrations, HTTP API, PostgreSQL CI and analytics views already exist. This
+> branch adds a protected rolling synthetic feed, a read-only `/demo`, and
+> separate liveness/readiness probes. Render activation remains an operator
+> gate; code in a branch is not evidence that production has been reconfigured.
+> See [MVP scope](#mvp-scope) and
 > [Out of MVP scope](#out-of-mvp-scope).
 >
 > **Note on the database:** local development still runs on SQLite (the
@@ -40,10 +41,15 @@ history.
 
 API: <https://paro-public.onrender.com> · docs: <https://paro-public.onrender.com/docs>
 
+After this branch is deployed, the read-only portfolio dashboard is served at
+`/demo` and updates from deterministic synthetic 15-minute buckets. It is not a
+streaming sensor or MES feed.
+
 > Runs on Render's free tier, which spins down after 15 minutes without
 > traffic; the first request after idling can take ~30-60s to respond
-> while the instance wakes up. There is no authentication on this demo —
-> don't send anything sensitive to it, all data is synthetic.
+> while the instance wakes up. Do not send sensitive data. Anonymous write
+> protection is not considered active until the deployment checks in
+> [`docs/deployment.md`](docs/deployment.md) pass against Render.
 
 ---
 
@@ -60,7 +66,8 @@ Continuous improvement, quality, and production engineers at manufacturing plant
 
 ## Value proposition
 
-PARO **is not a dashboard**. It's the service underneath one:
+PARO is primarily the service underneath a dashboard; `/demo` is a small,
+read-only proof surface for the portfolio:
 
 - Event capture with validation and **database-guaranteed idempotency**.
 - Correct interval arithmetic: overlapping events **do not** double-count lost
@@ -72,13 +79,20 @@ PARO **is not a dashboard**. It's the service underneath one:
 
 ## MVP scope
 
-- 5 endpoints: `GET /health`, `POST /api/v1/downtime-events`,
-  `PATCH /api/v1/downtime-events/{id}`, `POST /api/v1/production-records`,
-  `GET /api/v1/oee`.
+- Operational probes: `GET /health` for liveness and `GET /ready` for database
+  readiness.
+- Write API: `POST /api/v1/downtime-events`,
+  `PATCH /api/v1/downtime-events/{id}` and
+  `POST /api/v1/production-records`.
+- Read API: `GET /api/v1/oee` and the portfolio-specific
+  `GET /api/v1/demo/overview` read model.
 - Pure OEE engine in Python, no infrastructure dependencies.
 - PostgreSQL + SQLAlchemy 2 (sync) + Alembic.
 - Two enriched SQL fact views for Power BI.
-- Deterministic synthetic data with edge cases.
+- Deterministic synthetic data with absolute idempotency IDs and a bounded
+  48-hour rolling catch-up.
+- A packaged `/demo` page that polls the read model every 60 seconds; the
+  underlying feed cadence is 15 minutes.
 - Unit tests (domain) and integration tests. Target: real PostgreSQL, never SQLite;
   temporary exception documented in [ADR 0002](docs/adr/0002-sqlite-temporary-due-to-virtualization-block.md).
 
@@ -91,7 +105,7 @@ Deliberate decisions, documented in `docs/adr/`. Listed here so the project
 |---|---|
 | `GET /losses/pareto` as a REST endpoint | The SQL view already serves the same data to Power BI |
 | Physical date table | Power BI generates it with `CALENDARAUTO()` |
-| AI/LLM, frontend, sensors, MES | Out of scope by design |
+| AI/LLM, sensors, MES | Out of scope by design; the portfolio UI consumes synthetic API data |
 | User accounts, JWT/OAuth, RBAC | Out of scope by design — see [ADR 0005](docs/adr/0005-optional-api-key-authentication.md) for what *is* built (an optional API key) and why a full authz system isn't |
 
 ## Requirements
@@ -107,7 +121,8 @@ cp .env.example .env
 uv run uvicorn paro.main:app --reload
 ```
 
-Then: <http://127.0.0.1:8000/health> and <http://127.0.0.1:8000/docs>.
+Then: <http://127.0.0.1:8000/health>, <http://127.0.0.1:8000/ready>,
+<http://127.0.0.1:8000/docs>, and <http://127.0.0.1:8000/demo>.
 
 ## Development commands
 
@@ -140,11 +155,13 @@ open events) is documented in `docs/oee-definition.md`.
 ## Limitations
 
 - Demo data is **synthetic** and marked as such.
-- Authentication is optional and off by default: `POST`/`PATCH` write
+- Authentication is optional in the reusable application and off by default:
+  `POST`/`PATCH` write
   endpoints accept an `X-API-Key` header, checked against `PARO_API_KEY`
-  only when that variable is set — unset (the default, including on the
-  live demo above) means every write endpoint behaves exactly as it does
-  today. See [ADR 0005](docs/adr/0005-optional-api-key-authentication.md).
+  only when that variable is set. The public deployment is not release-ready
+  until that variable is configured and anonymous writes return `401`; see
+  [`docs/deployment.md`](docs/deployment.md) and
+  [ADR 0005](docs/adr/0005-optional-api-key-authentication.md).
   `POST`/`PATCH` are also excluded from CORS (browser JS on another
   origin can't call them) independent of the key; reads (`GET`) are open
   to any origin.
@@ -156,6 +173,8 @@ open events) is documented in `docs/oee-definition.md`.
 2. Sprint 2 - persistence, migrations, and idempotency.
 3. Sprint 3 - full API and integration tests.
 4. Sprint 4 - analytics layer, CI, and documentation.
+5. Portfolio readiness - protected rolling synthetic feed, dashboard, and
+   evidence-bounded case-study assets.
 
 ---
 

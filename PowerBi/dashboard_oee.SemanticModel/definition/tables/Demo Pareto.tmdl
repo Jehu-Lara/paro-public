@@ -1,0 +1,49 @@
+table 'Demo Pareto'
+	lineageTag: e939af19-a91f-4331-92d5-2e231849af6d
+
+	measure 'Downtime Seconds' = SUM('Demo Pareto'[seconds])
+		formatString: 0
+		lineageTag: a7792517-20f4-44ac-b3e5-b8a6759238da
+
+	measure 'Cumulative Share' = MAX('Demo Pareto'[cumulative_share])
+		formatString: 0%
+		lineageTag: 918fc59c-9d64-479e-8935-d6e162049d19
+
+	column reason
+		dataType: string
+		lineageTag: 8642346e-9852-45e5-89ed-27431ff3f708
+		summarizeBy: none
+		sourceColumn: reason
+
+	column seconds
+		dataType: int64
+		formatString: 0
+		lineageTag: 7dd5d24f-d79c-46b9-bb51-088efdd8b0b2
+		summarizeBy: none
+		sourceColumn: seconds
+
+	column share
+		dataType: double
+		lineageTag: 41c60603-53be-4981-902d-ebc9eb62390e
+		summarizeBy: none
+		sourceColumn: share
+
+	column cumulative_share
+		dataType: double
+		lineageTag: 3c32e8b0-1ff3-435b-bba8-355b3834203e
+		summarizeBy: none
+		sourceColumn: cumulative_share
+
+	partition 'Demo Pareto' = m
+		mode: import
+		source =
+				let
+				    Source = Json.Document(Web.Contents("https://paro-public.onrender.com", [RelativePath = "api/v1/demo/overview"])),
+				    Reasons = Source[top_reasons],
+				    Empty = #table(type table [reason=text, seconds=Int64.Type, share=number, cumulative_share=number], {}),
+				    Rows = if List.IsEmpty(Reasons) then Empty else Table.FromRecords(Reasons),
+				    Result = Table.TransformColumnTypes(Rows, {{"reason", type text}, {"seconds", Int64.Type}, {"share", type number}, {"cumulative_share", type number}}, "en-US")
+				in
+				    Result
+
+	annotation PBI_ResultType = Table

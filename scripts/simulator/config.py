@@ -48,6 +48,10 @@ WARMUP_SCRAP_MULTIPLIER = 2.5
 WARMUP_CYCLE_TIME_MULTIPLIER = 1.15
 BOTTLENECK_FAILURE_RATE_MULTIPLIER = 1.8
 BOTTLENECK_MICRO_STOP_RATE_MULTIPLIER = 1.4
+# Component hazards are divided across machines on a serial line. This
+# calibration keeps line-level availability in the documented acceptance
+# range after interval-union semantics and boundary-cycle losses are applied.
+SERIAL_LINE_EVENT_RATE_FACTOR = 0.8
 
 REASON_MIX_FAILURE_CLASS: dict[str, float] = {
     "mechanical": 0.55,
@@ -90,6 +94,8 @@ SHIFT_BOUNDARIES_LOCAL: dict[str, time] = {
 # paro.db.repositories). Not in section 10 either; matches the convention
 # scripts/seed_demo.py already uses (SOURCE = "seed_demo").
 SOURCE = "simulator"
+LIVE_SOURCE = "simulator-live-v1"
+LIVE_ID_NAMESPACE = "sim-live-v1"
 
 # Downtime-reason catalog codes the generator emits (simulator-spec.md
 # section 4.6's table). Same naming convention as scripts/seed_demo.py,

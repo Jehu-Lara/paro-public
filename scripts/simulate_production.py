@@ -31,7 +31,7 @@ from sqlalchemy.orm import Session
 
 from paro.db.models import DowntimeReason, Machine, ProductionLine
 from paro.db.session import get_engine, get_session_local
-from scripts.simulator.client import TRUSTED_INGEST_TOKEN_ENV_VAR
+from scripts.simulator.client import API_KEY_ENV_VAR, TRUSTED_INGEST_TOKEN_ENV_VAR
 from scripts.simulator.config import (
     MASTER_SEED,
     REASON_CODES_BY_FAILURE_CLASS,
@@ -160,6 +160,7 @@ def main(argv: list[str] | None = None) -> int:
         run,
         base_url=args.base_url,
         max_workers=args.max_workers,
+        api_key=os.environ.get(API_KEY_ENV_VAR),
         trusted_ingest_token=os.environ.get(TRUSTED_INGEST_TOKEN_ENV_VAR),
     )
     print(

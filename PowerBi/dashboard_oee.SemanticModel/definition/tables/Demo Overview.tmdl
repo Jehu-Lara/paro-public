@@ -1,0 +1,178 @@
+table 'Demo Overview'
+	lineageTag: 6c4f70b2-5980-4ac8-a9e8-4ad74626a73e
+
+	measure 'OEE KPI' = MAX('Demo Overview'[oee])
+		formatString: 0.0%
+		lineageTag: 1a3c5e7f-9570-4c31-ae61-88a0dd7dce30
+
+	measure 'Availability KPI' = MAX('Demo Overview'[availability])
+		formatString: 0.0%
+		lineageTag: 3bbfdc4d-17be-45c1-9824-45a9359940f2
+
+	measure 'Performance KPI' = MAX('Demo Overview'[performance_capped])
+		formatString: 0.0%
+		lineageTag: c1402e7f-b60c-4f5b-8b90-428ad36b4782
+
+	measure 'Quality KPI' = MAX('Demo Overview'[quality])
+		formatString: 0.0%
+		lineageTag: b970e06f-c67a-44e7-838f-46d35ddf467d
+
+	measure 'Produced KPI' = MAX('Demo Overview'[total_count])
+		formatString: 0
+		lineageTag: e45cbe52-c917-46e2-b966-f734191e1f95
+
+	measure 'Good KPI' = MAX('Demo Overview'[good_count])
+		formatString: 0
+		lineageTag: 6895f71b-dd90-49a2-b83f-2784c3108223
+
+	measure 'Rejected KPI' = MAX('Demo Overview'[rejected_count])
+		formatString: 0
+		lineageTag: 25a69827-7361-472a-8704-d952ab8a9d8c
+
+	measure 'Line Stop Minutes KPI' = DIVIDE(MAX('Demo Overview'[downtime_line_seconds]), 60)
+		formatString: 0.0
+		lineageTag: 44bd34f9-04ee-489a-8463-8167908cc8e4
+
+	measure 'Logged Event Minutes KPI' = DIVIDE(MAX('Demo Overview'[downtime_logged_event_seconds]), 60)
+		formatString: 0.0
+		lineageTag: 5af52432-cc99-42e5-b74f-b81088508a03
+
+	column generated_at
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: 932e36f3-702a-408c-8f8b-f7b4748abbdd
+		summarizeBy: none
+		sourceColumn: generated_at
+
+	column data_through
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: e320a05b-90d0-47bf-8119-73f7ae0ecb75
+		summarizeBy: none
+		sourceColumn: data_through
+
+	column freshness
+		dataType: string
+		lineageTag: ce9f31a6-a80f-49ab-945e-b61ee5de46be
+		summarizeBy: none
+		sourceColumn: freshness
+
+	column line_code
+		dataType: string
+		lineageTag: 27c96cea-9b3b-4d4d-a0b9-b15ef3581a46
+		summarizeBy: none
+		sourceColumn: line_code
+
+	column line_name
+		dataType: string
+		lineageTag: d2696863-14ce-4590-b19c-75b64cb16504
+		summarizeBy: none
+		sourceColumn: line_name
+
+	column shift
+		dataType: string
+		lineageTag: 460078ef-02a4-48ca-be32-e67dc4fbeaa7
+		summarizeBy: none
+		sourceColumn: shift
+
+	column window_start
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: 08e55a8a-a43d-4bb2-9412-d2414ce95d34
+		summarizeBy: none
+		sourceColumn: window_start
+
+	column window_end
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: 510e192f-6058-46bc-b791-97d86f2b52ea
+		summarizeBy: none
+		sourceColumn: window_end
+
+	column availability
+		dataType: double
+		lineageTag: 860f24e6-0aed-42bc-a42f-a13be0c946c6
+		summarizeBy: none
+		sourceColumn: availability
+
+	column performance_raw
+		dataType: double
+		lineageTag: ad60689b-322d-4e60-ad4c-4564a6be8725
+		summarizeBy: none
+		sourceColumn: performance_raw
+
+	column performance_capped
+		dataType: double
+		lineageTag: 50fb40cd-89dc-481a-a174-cf0617c1b0d4
+		summarizeBy: none
+		sourceColumn: performance_capped
+
+	column quality
+		dataType: double
+		lineageTag: 62bd1996-4389-4a5c-938c-75ca5cd4ca80
+		summarizeBy: none
+		sourceColumn: quality
+
+	column oee
+		dataType: double
+		lineageTag: f2ee2f38-01d5-4115-aec1-941bc2a49f0c
+		summarizeBy: none
+		sourceColumn: oee
+
+	column total_count
+		dataType: int64
+		formatString: 0
+		lineageTag: 7db7bb13-802b-42a0-99ce-8d3ad7889c27
+		summarizeBy: none
+		sourceColumn: total_count
+
+	column good_count
+		dataType: int64
+		formatString: 0
+		lineageTag: 0365fa17-7ddc-4572-ae98-6f146653e059
+		summarizeBy: none
+		sourceColumn: good_count
+
+	column rejected_count
+		dataType: int64
+		formatString: 0
+		lineageTag: 2393dbe3-e946-4af8-8afc-72a9fb0d10ea
+		summarizeBy: none
+		sourceColumn: rejected_count
+
+	column downtime_line_seconds
+		dataType: int64
+		formatString: 0
+		lineageTag: bc419899-b849-43b4-b4ba-566e0f4fc683
+		summarizeBy: none
+		sourceColumn: downtime_line_seconds
+
+	column downtime_logged_event_seconds
+		dataType: int64
+		formatString: 0
+		lineageTag: 918b6636-66cd-44cb-9221-67906a5c3907
+		summarizeBy: none
+		sourceColumn: downtime_logged_event_seconds
+
+	column warnings
+		dataType: string
+		lineageTag: 88c3a659-5186-4ab9-bc3d-8581c8a01318
+		summarizeBy: none
+		sourceColumn: warnings
+
+	partition 'Demo Overview' = m
+		mode: import
+		source =
+				let
+				    Source = Json.Document(Web.Contents("https://paro-public.onrender.com", [RelativePath = "api/v1/demo/overview"])),
+				    Line = Source[line],
+				    Window = Source[window],
+				    ToNumber = (value as any) as nullable number => if value = null then null else Number.FromText(Text.From(value), "en-US"),
+				    Result = #table(
+				        type table [generated_at=datetimezone, data_through=datetimezone, freshness=text, line_code=text, line_name=text, shift=text, window_start=datetimezone, window_end=datetimezone, availability=nullable number, performance_raw=nullable number, performance_capped=nullable number, quality=nullable number, oee=nullable number, total_count=Int64.Type, good_count=Int64.Type, rejected_count=Int64.Type, downtime_line_seconds=Int64.Type, downtime_logged_event_seconds=Int64.Type, warnings=text],
+				        {{DateTimeZone.FromText(Source[generated_at]), DateTimeZone.FromText(Source[data_through]), Source[freshness], Line[code], Line[name], Window[shift], DateTimeZone.FromText(Window[start]), DateTimeZone.FromText(Window[end]), ToNumber(Source[availability]), ToNumber(Source[performance_raw]), ToNumber(Source[performance_capped]), ToNumber(Source[quality]), ToNumber(Source[oee]), Int64.From(Source[total_count]), Int64.From(Source[good_count]), Int64.From(Source[rejected_count]), Int64.From(Source[downtime_line_seconds]), Int64.From(Source[downtime_logged_event_seconds]), if List.IsEmpty(Source[warnings]) then "None" else Text.Combine(List.Transform(Source[warnings], each Text.From(_)), ", ")}}
+				    )
+				in
+				    Result
+
+	annotation PBI_ResultType = Table

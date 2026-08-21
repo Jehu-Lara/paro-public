@@ -1,0 +1,15 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.11.0/schema.json",
+  "name": "40a0b0c0d0e0f0011223",
+  "position": {"x": 24, "y": 110, "z": 4000, "height": 150, "width": 1232, "tabOrder": 4000},
+  "visual": {
+    "visualType": "cardVisual",
+    "query": {"queryState": {"Data": {"projections": [
+      {"field": {"Measure": {"Expression": {"SourceRef": {"Entity": "Demo Overview"}}, "Property": "OEE KPI"}}, "queryRef": "Demo Overview.OEE KPI", "nativeQueryRef": "OEE"},
+      {"field": {"Measure": {"Expression": {"SourceRef": {"Entity": "Demo Overview"}}, "Property": "Availability KPI"}}, "queryRef": "Demo Overview.Availability KPI", "nativeQueryRef": "Availability"},
+      {"field": {"Measure": {"Expression": {"SourceRef": {"Entity": "Demo Overview"}}, "Property": "Performance KPI"}}, "queryRef": "Demo Overview.Performance KPI", "nativeQueryRef": "Performance"},
+      {"field": {"Measure": {"Expression": {"SourceRef": {"Entity": "Demo Overview"}}, "Property": "Quality KPI"}}, "queryRef": "Demo Overview.Quality KPI", "nativeQueryRef": "Quality"}
+    ]}}},
+    "drillFilterOtherVisuals": true
+  }
+}

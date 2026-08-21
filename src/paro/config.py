@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     default_timezone: str = "America/Monterrey"
     trusted_ingest_token: str | None = None
     api_key: str | None = None
+    demo_line_code: str = "SIM-L1"
+    demo_source: str = "simulator-live-v1"
+    demo_freshness_minutes: int = 30
 
 
 @lru_cache(maxsize=1)

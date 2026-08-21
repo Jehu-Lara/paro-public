@@ -52,7 +52,16 @@ async def _stale_update_handler(request: Request, exc: Exception) -> JSONRespons
 
 
 async def _generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
+    # Exception messages and tracebacks may contain SQL-bound values or other
+    # request-derived payload data.  Log only a fixed diagnostic allowlist.
+    logger.error(
+        "Unhandled exception",
+        extra={
+            "method": request.method,
+            "path": request.url.path,
+            "exception_type": type(exc).__name__,
+        },
+    )
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 

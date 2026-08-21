@@ -20,6 +20,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+simulator = [
+    "httpx2>=0.29",
+]
 dev = [
     "pytest>=8.4",
     "pytest-cov>=7.0",
