@@ -32,7 +32,8 @@ assets, screenshots, or Git history.
 
 ## Activation order
 
-1. Configure `PARO_API_KEY` on the existing web service and redeploy.
+1. Configure `PARO_API_KEY` and `PARO_TRUSTED_INGEST_TOKEN` on the existing
+   web service and redeploy.
 2. Verify anonymous writes return 401 and public reads remain available.
 3. Deploy the code containing the dual-header cron client.
 4. Configure both cron secrets and `PARO_BASE_URL`.
