@@ -9,13 +9,15 @@ model Model
 
 annotation __PBI_TimeIntelligenceEnabled = 0
 
-annotation PBI_QueryOrder = ["public production_record","public fact_downtime_event"]
+annotation PBI_QueryOrder = ["public production_record","public fact_downtime_event","Demo Overview","Demo Pareto"]
 
 annotation PBI_ProTooling = ["DevMode"]
 
 ref table 'public production_record'
 ref table Calendario
 ref table 'public fact_downtime_event'
+ref table 'Demo Overview'
+ref table 'Demo Pareto'
 
 ref cultureInfo en-US
 

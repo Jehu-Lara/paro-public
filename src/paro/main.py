@@ -8,22 +8,24 @@ import logging
 import time
 from typing import Any
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 from starlette.middleware.base import RequestResponseEndpoint
 
 from paro import __version__
+from paro.api.deps import get_db
 from paro.api.errors import register_exception_handlers
 from paro.api.rate_limit import limiter
+from paro.api.routers.demo import router as demo_router
 from paro.api.routers.downtime import router as downtime_router
 from paro.api.routers.oee import router as oee_router
 from paro.api.routers.production import router as production_router
-from paro.db.session import get_session_local
 from paro.logging_config import configure_logging
 
 configure_logging()
@@ -91,25 +93,41 @@ app.add_middleware(
 app.include_router(downtime_router)
 app.include_router(production_router)
 app.include_router(oee_router)
+app.include_router(demo_router)
 register_exception_handlers(app)
 
 
+def _database_reachable(db: Session) -> bool:
+    try:
+        db.execute(text("SELECT 1"))
+    except SQLAlchemyError:
+        return False
+    return True
+
+
 @app.get("/health", tags=["ops"])
-def health() -> dict[str, Any]:
+def health(db: Session = Depends(get_db)) -> dict[str, Any]:  # noqa: B008
     """Liveness of the application, plus a separate database reachability signal.
 
     Always returns 200 as long as the process is up, even when the
     database is unreachable: a failed ``SELECT 1`` is caught and reported
     via ``database`` instead of turning into a 500.
     """
-    try:
-        session = get_session_local()()
-        try:
-            session.execute(text("SELECT 1"))
-            database_status = "ok"
-        finally:
-            session.close()
-    except SQLAlchemyError:
-        database_status = "unreachable"
-
+    database_status = "ok" if _database_reachable(db) else "unreachable"
     return {"status": "ok", "version": __version__, "database": database_status}
+
+
+@app.get("/ready", tags=["ops"])
+def ready(db: Session = Depends(get_db)) -> Response:  # noqa: B008
+    """Dependency readiness, separate from the process liveness contract."""
+    if _database_reachable(db):
+        return Response(
+            content='{"status":"ready","database":"ok"}',
+            status_code=200,
+            media_type="application/json",
+        )
+    return Response(
+        content='{"status":"not_ready","database":"unreachable"}',
+        status_code=503,
+        media_type="application/json",
+    )

@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 from scripts.simulator.client import (
+    API_KEY_ENV_VAR,
     RETRY_MAX_ATTEMPTS,
     TRUSTED_INGEST_HEADER,
     ApiError,
@@ -133,3 +134,25 @@ def test_trusted_ingest_header_sent_only_when_token_given() -> None:
 
     assert client.calls[0]["headers"] is None
     assert client.calls[1]["headers"] == {TRUSTED_INGEST_HEADER: "secret"}
+
+
+def test_api_key_and_trusted_ingest_headers_are_sent_independently() -> None:
+    client = _ScriptedClient([201, 201])
+    _, sleep = _recording_sleep()
+
+    post_production_record(client, "http://api", _DRAFT, api_key="api-secret", sleep=sleep)
+    post_production_record(
+        client,
+        "http://api",
+        _DRAFT,
+        api_key="api-secret",
+        trusted_ingest_token="ingest-secret",
+        sleep=sleep,
+    )
+
+    assert API_KEY_ENV_VAR == "PARO_API_KEY"
+    assert client.calls[0]["headers"] == {"X-API-Key": "api-secret"}
+    assert client.calls[1]["headers"] == {
+        "X-API-Key": "api-secret",
+        TRUSTED_INGEST_HEADER: "ingest-secret",
+    }

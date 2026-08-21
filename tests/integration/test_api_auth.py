@@ -15,6 +15,7 @@ from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
 from paro.api.auth import API_KEY_HEADER
+from paro.api.rate_limit import TRUSTED_INGEST_HEADER, limiter
 from paro.config import get_settings
 from paro.db.models import DowntimeEvent, DowntimeReason, ProductionLine
 
@@ -209,3 +210,112 @@ def test_oee_read_stays_open_regardless_of_configured_key(
     )
 
     assert response.status_code == 200
+
+
+def test_trusted_ingest_token_alone_never_authenticates(
+    client: TestClient, migrated_engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    line_id, _ = _seed_line_and_reason(migrated_engine)
+    monkeypatch.setenv("PARO_TRUSTED_INGEST_TOKEN", "ingest-secret")
+    get_settings.cache_clear()
+    response = client.post(
+        "/api/v1/production-records",
+        headers={TRUSTED_INGEST_HEADER: "ingest-secret"},
+        json={
+            "line_id": line_id,
+            "interval_start": STARTED_AT,
+            "interval_end": ENDED_AT,
+            "total_count": 10,
+            "good_count": 9,
+            "ideal_cycle_time_seconds": "12.5",
+            "source": "cross-auth",
+            "external_id": "trusted-only",
+        },
+    )
+    assert response.status_code == 401
+
+
+def test_api_key_without_trusted_token_remains_rate_limited(
+    client: TestClient, migrated_engine: Engine
+) -> None:
+    line_id, _ = _seed_line_and_reason(migrated_engine)
+    limiter.reset()
+    statuses = []
+    for index in range(31):
+        response = client.post(
+            "/api/v1/production-records",
+            headers={API_KEY_HEADER: "secret-key"},
+            json={
+                "line_id": line_id,
+                "interval_start": STARTED_AT,
+                "interval_end": ENDED_AT,
+                "total_count": 10,
+                "good_count": 9,
+                "ideal_cycle_time_seconds": "12.5",
+                "source": "cross-auth-limited",
+                "external_id": f"limited-{index}",
+            },
+        )
+        statuses.append(response.status_code)
+    assert statuses[:30] == [201] * 30
+    assert statuses[30] == 429
+
+
+def test_both_credentials_authorize_and_exempt_rate_limit(
+    client: TestClient,
+    migrated_engine: Engine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    line_id, _ = _seed_line_and_reason(migrated_engine)
+    monkeypatch.setenv("PARO_TRUSTED_INGEST_TOKEN", "ingest-secret")
+    get_settings.cache_clear()
+    limiter.reset()
+    statuses = []
+    for index in range(31):
+        response = client.post(
+            "/api/v1/production-records",
+            headers={
+                API_KEY_HEADER: "secret-key",
+                TRUSTED_INGEST_HEADER: "ingest-secret",
+            },
+            json={
+                "line_id": line_id,
+                "interval_start": STARTED_AT,
+                "interval_end": ENDED_AT,
+                "total_count": 10,
+                "good_count": 9,
+                "ideal_cycle_time_seconds": "12.5",
+                "source": "cross-auth-exempt",
+                "external_id": f"exempt-{index}",
+            },
+        )
+        statuses.append(response.status_code)
+    assert statuses == [201] * 31
+
+
+def test_credentials_never_appear_in_request_logs(
+    client: TestClient,
+    migrated_engine: Engine,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    line_id, _ = _seed_line_and_reason(migrated_engine)
+    monkeypatch.setenv("PARO_TRUSTED_INGEST_TOKEN", "ingest-secret")
+    get_settings.cache_clear()
+    limiter.reset()
+    client.post(
+        "/api/v1/production-records",
+        headers={API_KEY_HEADER: "secret-key", TRUSTED_INGEST_HEADER: "ingest-secret"},
+        json={
+            "line_id": line_id,
+            "interval_start": STARTED_AT,
+            "interval_end": ENDED_AT,
+            "total_count": 10,
+            "good_count": 9,
+            "ideal_cycle_time_seconds": "12.5",
+            "source": "cross-auth-log",
+            "external_id": "log-check",
+        },
+    )
+    assert "secret-key" not in caplog.text
+    assert "ingest-secret" not in caplog.text

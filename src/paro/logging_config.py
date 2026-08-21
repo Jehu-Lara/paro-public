@@ -1,11 +1,9 @@
 """Structured (JSON) logging -- stdlib only, no new dependency.
 
 One JSON object per log line: ``timestamp``/``level``/``logger``/
-``message``, plus ``exception`` when the record carries ``exc_info``
-(e.g. ``logger.exception(...)`` in ``paro.api.errors``, which needs no
-changes of its own -- it already logs no headers, only ``request.method``/
-``request.url.path``), plus any caller-supplied ``extra=`` fields not
-already part of the standard ``LogRecord`` shape.
+``message``, plus any caller-supplied ``extra=`` fields not already part
+of the standard ``LogRecord`` shape. API handlers deliberately avoid
+tracebacks because database exceptions can embed bound payload values.
 """
 
 from __future__ import annotations

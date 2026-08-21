@@ -1,11 +1,12 @@
-"""JsonFormatter: valid, parseable JSON with the expected keys, including
-the exception-field case. Not testing configure_logging() itself -- it
+"""JsonFormatter: valid, parseable JSON with the expected keys. Not
+testing configure_logging() itself -- it
 mutates the root logger's handlers process-wide, which would leak
 between tests; the formatter is the actual unit under test.
 """
 
 import json
 import logging
+import sys
 
 from paro.logging_config import JsonFormatter
 
@@ -35,6 +36,13 @@ def test_format_produces_valid_json_with_expected_keys() -> None:
     assert "timestamp" in parsed
     assert "exception" not in parsed
 
+    try:
+        raise ValueError("formatter-branch")
+    except ValueError:
+        exception_record = _make_record(exc_info=sys.exc_info())
+    exception_parsed = json.loads(JsonFormatter().format(exception_record))
+    assert "ValueError: formatter-branch" in exception_parsed["exception"]
+
 
 def test_format_includes_extra_fields() -> None:
     record = _make_record()
@@ -47,17 +55,3 @@ def test_format_includes_extra_fields() -> None:
     assert parsed["method"] == "POST"
     assert parsed["status_code"] == 201
     assert parsed["duration_ms"] == 12.34
-
-
-def test_format_includes_exception_field_when_exc_info_present() -> None:
-    try:
-        raise ValueError("boom")
-    except ValueError:
-        import sys
-
-        record = _make_record(msg="failed", exc_info=sys.exc_info())
-
-    parsed = json.loads(JsonFormatter().format(record))
-
-    assert "exception" in parsed
-    assert "ValueError: boom" in parsed["exception"]

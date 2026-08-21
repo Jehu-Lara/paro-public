@@ -1,0 +1,9 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.11.0/schema.json",
+  "name": "50a0b0c0d0e0f0011223",
+  "position": {"x": 24, "y": 278, "z": 5000, "height": 42, "width": 770, "tabOrder": 5000},
+  "visual": {
+    "visualType": "textbox",
+    "objects": {"general": [{"properties": {"paragraphs": [{"textRuns": [{"value": "DOWNTIME PARETO", "textStyle": {"fontFamily": "Segoe UI Semibold", "fontSize": "15px", "color": "#102540"}}], "horizontalTextAlignment": "left"}]}}]}
+  }
+}

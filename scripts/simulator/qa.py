@@ -21,6 +21,7 @@ from itertools import pairwise
 from math import exp
 from typing import Literal
 
+from paro.domain.intervals import Interval, clip, duration_seconds
 from scripts.simulator.config import (
     ACCEPTANCE_BAND_CYCLE_TIME_RELATIVE,
     ACCEPTANCE_BAND_FAILURE_RELATIVE,
@@ -48,6 +49,7 @@ from scripts.simulator.config import (
     REASON_MIX_MICRO_STOP_CLASS,
     REASON_PLANNED_CHANGEOVER_CODE,
     SCRAP_PROBABILITY_BY_SHIFT,
+    SERIAL_LINE_EVENT_RATE_FACTOR,
     SHIFT_C_MICRO_STOP_RATE_MULTIPLIER,
 )
 from scripts.simulator.generator import _bottleneck_machine_ids
@@ -309,7 +311,9 @@ def _mean_lognormal(mu: float, sigma: float) -> float:
     return exp(mu + sigma**2 / 2)
 
 
-def _machine_shift_unplanned_stats(*, is_bottleneck: bool, shift_code: str) -> tuple[float, float]:
+def _machine_shift_unplanned_stats(
+    *, is_bottleneck: bool, shift_code: str, event_rate_scale: float = 1.0
+) -> tuple[float, float]:
     """``(expected_micro_stops, expected_failures)`` for one machine over one
     8h shift -- simulator-spec.md section 4.0's per-shift decomposition,
     generalized with the bottleneck/shift-C multipliers section 4.5 adds.
@@ -317,13 +321,13 @@ def _machine_shift_unplanned_stats(*, is_bottleneck: bool, shift_code: str) -> t
     mean_micro_stop_duration = _mean_lognormal(MICRO_STOP_DURATION_MU, MICRO_STOP_DURATION_SIGMA)
     mean_failure_duration = _mean_lognormal(FAILURE_DURATION_MU, FAILURE_DURATION_SIGMA)
 
-    micro_stop_lambda = MICRO_STOP_LAMBDA_PER_RUN_HOUR
+    micro_stop_lambda = MICRO_STOP_LAMBDA_PER_RUN_HOUR * event_rate_scale
     if shift_code == "C":
         micro_stop_lambda *= SHIFT_C_MICRO_STOP_RATE_MULTIPLIER
     if is_bottleneck:
         micro_stop_lambda *= BOTTLENECK_MICRO_STOP_RATE_MULTIPLIER
 
-    failure_lambda = FAILURE_LAMBDA_PER_RUN_HOUR
+    failure_lambda = FAILURE_LAMBDA_PER_RUN_HOUR * event_rate_scale
     if is_bottleneck:
         failure_lambda *= BOTTLENECK_FAILURE_RATE_MULTIPLIER
 
@@ -342,11 +346,18 @@ def expected_unplanned_counts(config: SimulatorConfig, days: int) -> ExpectedCou
 
     total_micro_stops = 0.0
     total_failures = 0.0
+    machines_per_line: dict[int, int] = {}
+    for machine in machines_sorted:
+        machines_per_line[machine.line_id] = machines_per_line.get(machine.line_id, 0) + 1
     for machine in machines_sorted:
         is_bottleneck = bottleneck_machine_id_by_line[machine.line_id] == machine.machine_id
         for shift_code in ("A", "B", "C"):
             micro_stops, failures = _machine_shift_unplanned_stats(
-                is_bottleneck=is_bottleneck, shift_code=shift_code
+                is_bottleneck=is_bottleneck,
+                shift_code=shift_code,
+                event_rate_scale=(
+                    SERIAL_LINE_EVENT_RATE_FACTOR / machines_per_line[machine.line_id]
+                ),
             )
             total_micro_stops += micro_stops
             total_failures += failures
@@ -456,37 +467,34 @@ def check_statistical_bands(
                     ACCEPTANCE_BAND_REASON_MIX_RELATIVE,
                 )
 
-    machines_per_line: dict[int, int] = {}
-    for machine in config.machines:
-        machines_per_line[machine.line_id] = machines_per_line.get(machine.line_id, 0) + 1
-    downtime_seconds_by_line: dict[int, float] = {}
-    for event in run.downtime_events:
-        if event.ended_at is None:
-            continue
-        duration = (event.ended_at - event.started_at).total_seconds()
-        downtime_seconds_by_line[event.line_id] = (
-            downtime_seconds_by_line.get(event.line_id, 0.0) + duration
-        )
     cycles_by_line: dict[int, int] = {}
     for record in run.production_records:
         cycles_by_line[record.line_id] = cycles_by_line.get(record.line_id, 0) + record.total_count
-    window_seconds = days * 24 * 3600
-    for line in config.lines:
-        cycles = cycles_by_line.get(line.line_id, 0)
-        if cycles == 0:
-            continue
-        run_time_seconds = machines_per_line.get(
-            line.line_id, 0
-        ) * window_seconds - downtime_seconds_by_line.get(line.line_id, 0.0)
-        observed_mean_cycle = run_time_seconds / cycles
-        expected_mean_cycle = CYCLE_TIME_MEAN_MULTIPLIER * float(line.ideal_cycle_time_seconds)
-        _check_relative_band(
-            findings,
-            f"mean_cycle_time_out_of_band_line_{line.line_id}",
-            observed_mean_cycle,
-            expected_mean_cycle,
-            ACCEPTANCE_BAND_CYCLE_TIME_RELATIVE,
-        )
+    if run.production_records:
+        window_start = min(record.interval_start for record in run.production_records)
+        window_end = max(record.interval_end for record in run.production_records)
+        simulation_window = Interval(window_start, window_end)
+        for line in config.lines:
+            cycles = cycles_by_line.get(line.line_id, 0)
+            if cycles == 0:
+                continue
+            line_stops = [
+                clipped
+                for event in run.downtime_events
+                if event.line_id == line.line_id and event.ended_at is not None
+                for clipped in [clip(Interval(event.started_at, event.ended_at), simulation_window)]
+                if clipped is not None
+            ]
+            run_time_seconds = simulation_window.seconds - duration_seconds(line_stops)
+            observed_mean_cycle = run_time_seconds / cycles
+            expected_mean_cycle = CYCLE_TIME_MEAN_MULTIPLIER * float(line.ideal_cycle_time_seconds)
+            _check_relative_band(
+                findings,
+                f"mean_cycle_time_out_of_band_line_{line.line_id}",
+                observed_mean_cycle,
+                expected_mean_cycle,
+                ACCEPTANCE_BAND_CYCLE_TIME_RELATIVE,
+            )
 
     for line_id, oee_value in oee_by_line.items():
         if oee_value is None:

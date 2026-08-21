@@ -1,5 +1,18 @@
 # Advanced Industrial Simulator — implementation spec
 
+> **Implementation status (2026-08-20):** the pure deterministic generator,
+> QA checks, dual-header transport and rolling demo driver now exist. The
+> rolling driver uses source `simulator-live-v1`, SHA-256-derived daily seeds,
+> absolute timestamp IDs, and a 48-hour catch-up cap. Historical design notes
+> below remain useful for statistical assumptions, but any statement saying
+> these components are “not built” is superseded by
+> [ADR 0004](adr/0004-simulator-multi-agent-architecture.md) and the code.
+> The implemented line model is serial: one deterministic bottleneck cycle
+> clock, cycles removed when any component is stopped, and line-level event
+> hazards distributed across the configured machines. Earlier per-machine
+> production-count arithmetic in sections 4–6 is historical and must not be
+> used to reconcile the live OEE feed.
+
 ## Parámetros estadísticos (única fuente de verdad)
 
 - **Versión:** 2
@@ -134,9 +147,11 @@ from a single `MASTER_SEED`:
 ```python
 import hashlib
 
+
 def machine_seed(master_seed: int, machine_id: int) -> int:
     digest = hashlib.sha256(f"{master_seed}:{machine_id}".encode()).digest()
     return int.from_bytes(digest[:8], "big")
+
 
 machine_rng = random.Random(machine_seed(MASTER_SEED, machine.id))
 ```
@@ -603,7 +618,7 @@ pacing (wait out the limiter) was considered and is not viable: it turns a
 
 ### Decision: trusted-ingest exemption, env-gated
 
-Implement in a **later task** (specced here, not built now):
+Implemented as an env-gated, orthogonal credential path:
 
 - `PARO_TRUSTED_INGEST_TOKEN` — new env var. **Unset by default**, meaning
   no exemption is possible at all unless an operator deliberately
@@ -630,11 +645,10 @@ abuse from the public internet — a purpose the simulator, running as a
 known, credentialed, trusted client, doesn't need exercised on every one of
 21,823 writes.
 
-**Follow-up, not part of this build:** the rate limiter itself still
-deserves a test — it has none today. A small, dedicated test (fire 35
-requests without the trusted-ingest header, assert the 31st gets `429`) is
-the right shape for that, not an incidental 10-hour side effect of running
-the simulator. Track as a separate task.
+The rate limiter now has dedicated integration coverage: an API key without
+the trusted-ingest token can write but remains limited, while valid API key
+plus valid trusted-ingest token is exempt. Trusted-ingest without the API key
+still returns `401`, proving the two mechanisms are orthogonal.
 
 ### 429 handling
 
@@ -852,14 +866,12 @@ example of both halves of that line, not just the first one.
 
 ## Out of scope for this document
 
-- The actual simulator source code, and the actual QA Agent check code —
-  Steps 1-5, not started.
+- The simulator implementation is in `scripts/simulator/`; this document does
+  not duplicate the executable source.
 - The 7 `downtime_reason` catalog rows (section 4.6) were Step 1 — done in
   `scripts/seed_demo.py`, not in this document.
-- The trusted-ingest exemption's implementation in
-  `src/paro/api/rate_limit.py` and the routers — specced in section 6, not
-  built here (Step 2).
-- The dedicated rate-limiter test (section 6's follow-up) — separate task.
+- The trusted-ingest exemption and its cross-credential integration tests are
+  implemented; deployment still requires operator-managed secrets.
 - The bulk/batch ingest endpoint (section 6) — deferred, named only.
 - The Weibull hazard upgrade (section 4.7) — future, named only.
 - LangGraph/Ollama orchestration (Step 5) — build-tool dependencies only,

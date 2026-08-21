@@ -1,0 +1,9 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.11.0/schema.json",
+  "name": "30a0b0c0d0e0f0011223",
+  "position": {"x": 908, "y": 22, "z": 3000, "height": 58, "width": 348, "tabOrder": 3000},
+  "visual": {
+    "visualType": "textbox",
+    "objects": {"general": [{"properties": {"paragraphs": [{"textRuns": [{"value": "SYNTHETIC PORTFOLIO DATA\nUpdated every 15 minutes · not streaming", "textStyle": {"fontFamily": "Segoe UI Semibold", "fontSize": "12px", "color": "#147A70"}}], "horizontalTextAlignment": "right"}]}}]}
+  }
+}

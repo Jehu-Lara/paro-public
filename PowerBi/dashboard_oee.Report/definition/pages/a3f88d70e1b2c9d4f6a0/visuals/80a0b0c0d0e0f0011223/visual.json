@@ -1,0 +1,14 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.11.0/schema.json",
+  "name": "80a0b0c0d0e0f0011223",
+  "position": {"x": 820, "y": 320, "z": 8000, "height": 170, "width": 436, "tabOrder": 8000},
+  "visual": {
+    "visualType": "cardVisual",
+    "query": {"queryState": {"Data": {"projections": [
+      {"field": {"Measure": {"Expression": {"SourceRef": {"Entity": "Demo Overview"}}, "Property": "Produced KPI"}}, "queryRef": "Demo Overview.Produced KPI", "nativeQueryRef": "Produced"},
+      {"field": {"Measure": {"Expression": {"SourceRef": {"Entity": "Demo Overview"}}, "Property": "Good KPI"}}, "queryRef": "Demo Overview.Good KPI", "nativeQueryRef": "Good"},
+      {"field": {"Measure": {"Expression": {"SourceRef": {"Entity": "Demo Overview"}}, "Property": "Rejected KPI"}}, "queryRef": "Demo Overview.Rejected KPI", "nativeQueryRef": "Rejected"}
+    ]}}},
+    "drillFilterOtherVisuals": true
+  }
+}

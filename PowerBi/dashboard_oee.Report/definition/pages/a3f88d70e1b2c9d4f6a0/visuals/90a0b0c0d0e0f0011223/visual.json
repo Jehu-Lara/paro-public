@@ -1,0 +1,12 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.11.0/schema.json",
+  "name": "90a0b0c0d0e0f0011223",
+  "position": {"x": 820, "y": 512, "z": 9000, "height": 170, "width": 436, "tabOrder": 9000},
+  "visual": {
+    "visualType": "textbox",
+    "objects": {"general": [{"properties": {"paragraphs": [
+      {"textRuns": [{"value": "ENGINEERING NOTES", "textStyle": {"fontFamily": "Segoe UI Semibold", "fontSize": "14px", "color": "#102540"}}], "horizontalTextAlignment": "left"},
+      {"textRuns": [{"value": "• OEE is calculated once in paro.domain.oee.calculate_oee.\n• Power BI reads the API result; it does not rebuild OEE in DAX.\n• Fresh/stale status, warnings and refresh timestamps are preserved in the imported table.\n• Portfolio data is synthetic; no production or savings claim.", "textStyle": {"fontFamily": "Segoe UI", "fontSize": "11px", "color": "#51657A"}}], "horizontalTextAlignment": "left"}
+    ]}}]}
+  }
+}

@@ -303,10 +303,10 @@ def test_chosen_topology_reproduces_section_4_5() -> None:
 
     expected = expected_unplanned_counts(config, days=1)
 
-    per_machine_micro_stops = expected.micro_stop_count / len(config.machines)
-    per_machine_failures = expected.failure_count / len(config.machines)
-    assert per_machine_micro_stops == pytest.approx(74.25, rel=5e-3)
-    assert per_machine_failures == pytest.approx(4.33, rel=5e-3)
+    per_line_micro_stops = expected.micro_stop_count / len(config.lines)
+    per_line_failures = expected.failure_count / len(config.lines)
+    assert per_line_micro_stops == pytest.approx(68.81, rel=5e-3)
+    assert per_line_failures == pytest.approx(4.030, rel=5e-3)
 
 
 # ---- check_statistical_bands ---------------------------------------------

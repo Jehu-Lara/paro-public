@@ -174,15 +174,11 @@ def run(session: Session) -> dict[str, int]:
     _get_or_create_reason(session, REASON_FAILURE_ELECTRICAL_CODE, "Falla electrica", False)
     _get_or_create_reason(session, REASON_FAILURE_PNEUMATIC_CODE, "Falla neumatica", False)
     _get_or_create_reason(session, REASON_FAILURE_SENSOR_CODE, "Falla de sensor", False)
-    _get_or_create_reason(
-        session, REASON_MICRO_STOP_MATERIAL_JAM_CODE, "Atasco de material", False
-    )
+    _get_or_create_reason(session, REASON_MICRO_STOP_MATERIAL_JAM_CODE, "Atasco de material", False)
     _get_or_create_reason(
         session, REASON_MICRO_STOP_STARVATION_CODE, "Desabasto de material", False
     )
-    _get_or_create_reason(
-        session, REASON_MICRO_STOP_MINOR_ADJUSTMENT_CODE, "Ajuste menor", False
-    )
+    _get_or_create_reason(session, REASON_MICRO_STOP_MINOR_ADJUSTMENT_CODE, "Ajuste menor", False)
     _get_or_create_shift(session, line)
 
     _, was_created_first = create_downtime_event(
