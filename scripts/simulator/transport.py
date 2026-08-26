@@ -23,7 +23,7 @@ import httpx2
 
 from scripts.simulator.client import (
     REQUEST_TIMEOUT_SECONDS,
-    ApiError,
+    ClientError,
     HttpClient,
     post_downtime_event,
     post_production_record,
@@ -123,7 +123,7 @@ def transport(
             draft = production_futures[future]
             try:
                 _, was_created = future.result()
-            except ApiError as exc:
+            except ClientError as exc:
                 failures.append(TransportFailure("production_record", draft, str(exc)))
             else:
                 if was_created:
@@ -135,7 +135,7 @@ def transport(
             downtime_draft = downtime_futures[future]
             try:
                 _, was_created = future.result()
-            except ApiError as exc:
+            except ClientError as exc:
                 failures.append(TransportFailure("downtime_event", downtime_draft, str(exc)))
             else:
                 if was_created:

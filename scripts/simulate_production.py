@@ -21,7 +21,6 @@ transport failures.
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 from datetime import datetime
 from decimal import Decimal
@@ -31,7 +30,7 @@ from sqlalchemy.orm import Session
 
 from paro.db.models import DowntimeReason, Machine, ProductionLine
 from paro.db.session import get_engine, get_session_local
-from scripts.simulator.client import API_KEY_ENV_VAR, TRUSTED_INGEST_TOKEN_ENV_VAR
+from scripts.simulator.client import load_api_credentials
 from scripts.simulator.config import (
     MASTER_SEED,
     REQUIRED_REASON_CATALOG,
@@ -167,12 +166,13 @@ def main(argv: list[str] | None = None) -> int:
         f"{len(run.downtime_events)} downtime_events"
     )
 
+    credentials = load_api_credentials()
     result = transport(
         run,
         base_url=args.base_url,
         max_workers=args.max_workers,
-        api_key=os.environ.get(API_KEY_ENV_VAR),
-        trusted_ingest_token=os.environ.get(TRUSTED_INGEST_TOKEN_ENV_VAR),
+        api_key=credentials.api_key,
+        trusted_ingest_token=credentials.trusted_ingest_token,
     )
     print(
         f"[simulate_production] Transport: "

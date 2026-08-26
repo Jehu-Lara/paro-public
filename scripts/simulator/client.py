@@ -12,9 +12,12 @@ independently-maintained serializer.
 from __future__ import annotations
 
 import dataclasses
+import os
 import time
 from collections.abc import Mapping
 from typing import Any, Protocol
+
+import httpx2
 
 from paro.api.auth import API_KEY_HEADER
 from paro.json_safe import json_safe
@@ -24,7 +27,12 @@ __all__ = [
     "API_KEY_ENV_VAR",
     "TRUSTED_INGEST_HEADER",
     "TRUSTED_INGEST_TOKEN_ENV_VAR",
+    "ApiCredentials",
     "ApiError",
+    "ClientError",
+    "ResponseDecodeError",
+    "SimulatorTransportError",
+    "load_api_credentials",
     "patch_downtime_event",
     "post_downtime_event",
     "post_production_record",
@@ -38,6 +46,21 @@ RETRY_BASE_DELAY_SECONDS = 1.0
 RETRY_MAX_DELAY_SECONDS = 60.0
 RETRY_MAX_ATTEMPTS = 8
 REQUEST_TIMEOUT_SECONDS = 10.0
+
+
+@dataclasses.dataclass(frozen=True)
+class ApiCredentials:
+    api_key: str | None
+    trusted_ingest_token: str | None
+
+
+def load_api_credentials(environ: Mapping[str, str] | None = None) -> ApiCredentials:
+    """Loads both simulator credentials without logging either value."""
+    source = os.environ if environ is None else environ
+    return ApiCredentials(
+        api_key=source.get(API_KEY_ENV_VAR),
+        trusted_ingest_token=source.get(TRUSTED_INGEST_TOKEN_ENV_VAR),
+    )
 
 
 class HttpResponse(Protocol):
@@ -57,7 +80,11 @@ class HttpClient(Protocol):
     ) -> HttpResponse: ...
 
 
-class ApiError(Exception):
+class ClientError(Exception):
+    """Base class for safe, per-row simulator failures."""
+
+
+class ApiError(ClientError):
     """Non-retryable failure: 4xx/5xx response, or 429 retry-budget exhaustion."""
 
     def __init__(self, status_code: int, body: Any, draft: object) -> None:
@@ -81,8 +108,33 @@ class ApiError(Exception):
         self.draft = draft
 
 
-def _post_with_retry(
+class SimulatorTransportError(ClientError):
+    """A transient HTTP transport error exhausted its retry budget."""
+
+    def __init__(self, exception_type: str, draft: object) -> None:
+        super().__init__(f"API transport failed after retries: {exception_type}")
+        self.exception_type = exception_type
+        self.draft = draft
+
+
+class ResponseDecodeError(ClientError):
+    """An API response could not be decoded without exposing its body."""
+
+    def __init__(self, draft: object) -> None:
+        super().__init__("API response was not valid JSON")
+        self.draft = draft
+
+
+def _safe_json(response: HttpResponse, draft: object) -> Any:
+    try:
+        return response.json()
+    except (TypeError, ValueError) as exc:
+        raise ResponseDecodeError(draft) from exc
+
+
+def _request_with_retry(
     client: HttpClient,
+    method: str,
     url: str,
     json_body: Any,
     *,
@@ -98,10 +150,17 @@ def _post_with_retry(
         headers[TRUSTED_INGEST_HEADER] = trusted_ingest_token
 
     for attempt in range(RETRY_MAX_ATTEMPTS):
-        response = client.request("POST", url, json=json_body, headers=headers or None)
+        try:
+            response = client.request(method, url, json=json_body, headers=headers or None)
+        except httpx2.TransportError as exc:
+            if attempt == RETRY_MAX_ATTEMPTS - 1:
+                raise SimulatorTransportError(type(exc).__name__, draft) from exc
+            delay = min(RETRY_BASE_DELAY_SECONDS * (2**attempt), RETRY_MAX_DELAY_SECONDS)
+            sleep(delay)
+            continue
         if response.status_code == 429:
             if attempt == RETRY_MAX_ATTEMPTS - 1:
-                raise ApiError(response.status_code, response.json(), draft)
+                raise ApiError(response.status_code, _safe_json(response, draft), draft)
             delay = min(RETRY_BASE_DELAY_SECONDS * (2**attempt), RETRY_MAX_DELAY_SECONDS)
             sleep(delay)
             continue
@@ -112,7 +171,7 @@ def _post_with_retry(
             # not transient noise -- retrying it would hide exactly the
             # kind of defect this transport layer exists to surface. A
             # 409/422 is a real data problem retrying can't fix either way.
-            raise ApiError(response.status_code, response.json(), draft)
+            raise ApiError(response.status_code, _safe_json(response, draft), draft)
         return response
 
     raise AssertionError("unreachable: loop always returns or raises")
@@ -133,8 +192,9 @@ def post_production_record(
     ``201`` = new row, ``200`` = existing (idempotent no-op).
     """
     body = json_safe(dataclasses.asdict(draft))
-    response = _post_with_retry(
+    response = _request_with_retry(
         client,
+        "POST",
         f"{base_url}/api/v1/production-records",
         body,
         draft=draft,
@@ -142,7 +202,7 @@ def post_production_record(
         trusted_ingest_token=trusted_ingest_token,
         sleep=sleep,
     )
-    return response.json(), response.status_code == 201
+    return _safe_json(response, draft), response.status_code == 201
 
 
 def post_downtime_event(
@@ -160,8 +220,9 @@ def post_downtime_event(
     ``201`` = new row, ``200`` = existing (idempotent no-op).
     """
     body = json_safe(dataclasses.asdict(draft))
-    response = _post_with_retry(
+    response = _request_with_retry(
         client,
+        "POST",
         f"{base_url}/api/v1/downtime-events",
         body,
         draft=draft,
@@ -169,7 +230,7 @@ def post_downtime_event(
         trusted_ingest_token=trusted_ingest_token,
         sleep=sleep,
     )
-    return response.json(), response.status_code == 201
+    return _safe_json(response, draft), response.status_code == 201
 
 
 def patch_downtime_event(
@@ -182,13 +243,9 @@ def patch_downtime_event(
     api_key: str | None = None,
     trusted_ingest_token: str | None = None,
     actor: str = "simulator-live-v1",
+    sleep: Any = time.sleep,
 ) -> Any:
     """Closes one previously-open deterministic simulator event."""
-    headers: dict[str, str] = {}
-    if api_key:
-        headers[API_KEY_HEADER] = api_key
-    if trusted_ingest_token:
-        headers[TRUSTED_INGEST_HEADER] = trusted_ingest_token
     body = json_safe(
         {
             "expected_updated_at": expected_updated_at,
@@ -196,12 +253,14 @@ def patch_downtime_event(
             "actor": actor,
         }
     )
-    response = client.request(
+    response = _request_with_retry(
+        client,
         "PATCH",
         f"{base_url}/api/v1/downtime-events/{event_id}",
-        json=body,
-        headers=headers or None,
+        body,
+        draft=body,
+        api_key=api_key,
+        trusted_ingest_token=trusted_ingest_token,
+        sleep=sleep,
     )
-    if response.status_code >= 400:
-        raise ApiError(response.status_code, response.json(), body)
-    return response.json()
+    return _safe_json(response, body)
