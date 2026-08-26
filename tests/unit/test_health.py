@@ -47,3 +47,11 @@ def test_health_version_matches_openapi() -> None:
 
 def test_unknown_route_returns_404() -> None:
     assert client.get("/no-existe").status_code == 404
+
+
+def test_responses_include_defensive_security_headers() -> None:
+    response = client.get("/health")
+
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["referrer-policy"] == "no-referrer"

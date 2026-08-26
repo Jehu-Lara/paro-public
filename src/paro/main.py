@@ -34,6 +34,12 @@ from paro.logging_config import configure_logging
 configure_logging()
 logger = logging.getLogger(__name__)
 
+SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+}
+
 
 @asynccontextmanager
 async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -49,6 +55,13 @@ app = FastAPI(
     summary="Downtime capture and deterministic OEE calculation for a production line.",
     lifespan=_lifespan,
 )
+
+
+@app.middleware("http")
+async def _add_security_headers(request: Request, call_next: RequestResponseEndpoint) -> Response:
+    response = await call_next(request)
+    response.headers.update(SECURITY_HEADERS)
+    return response
 
 
 @app.middleware("http")

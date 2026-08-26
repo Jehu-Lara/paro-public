@@ -51,6 +51,11 @@ queried — not reproducible, and it's also exactly the decision
 
 Grain: **one row per `production_record`**.
 
+The current Power BI semantic model deliberately imports the raw
+`production_record` table for its historical report contract; the enriched
+`fact_production_record` view below remains the documented analytics schema
+for new consumers.
+
 | Column | Source | Type |
 |---|---|---|
 | `production_record_id` | `production_record.id` | raw fact |
@@ -91,7 +96,6 @@ in the report, not in the view.
 
 ## Out of scope for this document
 
-- The views' real SQL (`CREATE VIEW`) — migration 002, deferred.
 - Any physical date table — the README already documents that Power BI
   generates it with `CALENDARAUTO()`.
 - `GET /losses/pareto` as a REST endpoint — the README already documents
