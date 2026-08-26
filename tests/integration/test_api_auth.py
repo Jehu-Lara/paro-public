@@ -25,6 +25,7 @@ ENDED_AT = datetime(2026, 8, 10, 22, 5, tzinfo=UTC).isoformat()
 
 @pytest.fixture(autouse=True)
 def _api_key_configured(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    monkeypatch.setenv("PARO_ENV", "production")
     monkeypatch.setenv("PARO_API_KEY", "secret-key")
     get_settings.cache_clear()
     yield

@@ -28,9 +28,20 @@ def _clear_settings_cache() -> Iterator[None]:
 
 
 def test_no_gate_when_key_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PARO_ENV", "local")
     monkeypatch.delenv("PARO_API_KEY", raising=False)
 
     require_api_key(_request())  # no exception
+
+
+def test_production_without_key_rejects_writes(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PARO_ENV", "PrOdUcTiOn")
+    monkeypatch.setenv("PARO_API_KEY", "   ")
+
+    with pytest.raises(HTTPException) as exc_info:
+        require_api_key(_request())
+
+    assert exc_info.value.status_code == 503
 
 
 def test_401_when_key_set_and_header_missing(monkeypatch: pytest.MonkeyPatch) -> None:
