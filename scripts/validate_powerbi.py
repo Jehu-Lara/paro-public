@@ -48,6 +48,26 @@ def _validate_json(path: Path) -> ValidationFailure | None:
     return None
 
 
+def _has_unclosed_single_quote(text: str) -> bool:
+    """Checks quoted TMDL identifiers without parsing TMDL semantics.
+
+    Two adjacent quotes (``''``) are one escaped quote and never toggle
+    identifier state. Every other quote opens or closes the current
+    identifier, so an active state at EOF is an obvious truncation.
+    """
+    in_quote = False
+    index = 0
+    while index < len(text):
+        if text[index] != "'":
+            index += 1
+        elif index + 1 < len(text) and text[index + 1] == "'":
+            index += 2
+        else:
+            in_quote = not in_quote
+            index += 1
+    return in_quote
+
+
 def _validate_tmdl(path: Path) -> ValidationFailure | None:
     raw = path.read_bytes()
     if not raw:
@@ -69,6 +89,11 @@ def _validate_tmdl(path: Path) -> ValidationFailure | None:
         pass
     else:
         return ValidationFailure(path, "JSON valido no es una fuente TMDL")
+
+    if text.count("(") > text.count(")"):
+        return ValidationFailure(path, "TMDL contiene parentesis sin cerrar")
+    if _has_unclosed_single_quote(text):
+        return ValidationFailure(path, "TMDL contiene identificador entre comillas sin cerrar")
 
     last_line = stripped.splitlines()[-1].rstrip()
     if last_line.endswith((":", "=")):
