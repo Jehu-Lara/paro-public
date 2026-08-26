@@ -185,6 +185,24 @@ def test_patch_naive_expected_updated_at_returns_422(
     assert response.status_code == 422
 
 
+def test_patch_rejects_actor_longer_than_database_column(
+    client: TestClient, migrated_engine: Engine
+) -> None:
+    event_id, _, _ = _seed_event(migrated_engine)
+    expected_updated_at = _current_updated_at(migrated_engine, event_id)
+
+    response = client.patch(
+        f"/api/v1/downtime-events/{event_id}",
+        json={
+            "expected_updated_at": expected_updated_at,
+            "operator_note": "corrected",
+            "actor": "a" * 201,
+        },
+    )
+
+    assert response.status_code == 422
+
+
 def test_patch_machine_id_reference(client: TestClient, migrated_engine: Engine) -> None:
     event_id, line_id, _ = _seed_event(migrated_engine)
     expected_updated_at = _current_updated_at(migrated_engine, event_id)

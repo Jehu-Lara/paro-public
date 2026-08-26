@@ -157,3 +157,26 @@ def test_post_invalid_payload_returns_422(
     )
 
     assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("source", "s" * 101),
+        ("external_id", "e" * 201),
+    ],
+)
+def test_post_rejects_strings_longer_than_database_columns(
+    client: TestClient,
+    migrated_engine: Engine,
+    field: str,
+    value: str,
+) -> None:
+    line_id, reason_id = _seed_line_and_reason(migrated_engine)
+
+    response = client.post(
+        "/api/v1/downtime-events",
+        json=_payload(line_id, reason_id, **{field: value}),
+    )
+
+    assert response.status_code == 422
