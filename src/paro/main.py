@@ -23,7 +23,7 @@ from starlette.middleware.base import RequestResponseEndpoint
 from paro import __version__
 from paro.api.auth import production_api_key_missing
 from paro.api.deps import get_db
-from paro.api.errors import register_exception_handlers
+from paro.api.errors import SECURITY_HEADERS, register_exception_handlers
 from paro.api.rate_limit import limiter
 from paro.api.routers.demo import router as demo_router
 from paro.api.routers.downtime import router as downtime_router
@@ -33,12 +33,6 @@ from paro.logging_config import configure_logging
 
 configure_logging()
 logger = logging.getLogger(__name__)
-
-SECURITY_HEADERS = {
-    "X-Content-Type-Options": "nosniff",
-    "X-Frame-Options": "DENY",
-    "Referrer-Policy": "no-referrer",
-}
 
 
 @asynccontextmanager

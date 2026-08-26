@@ -12,3 +12,10 @@ and coordinate disclosure after a fix is available.
 
 This repository does not publish a security mailbox; no email address is
 invented here.
+
+## Browser response policy
+
+Content Security Policy is intentionally omitted because a single restrictive
+policy would break the Swagger UI under `/docs` and the bundled demo page.
+Defining separate, tested policies for those surfaces remains an accepted
+residual risk; this hardening change does not claim CSP coverage.
