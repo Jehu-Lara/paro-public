@@ -61,7 +61,21 @@ class ApiError(Exception):
     """Non-retryable failure: 4xx/5xx response, or 429 retry-budget exhaustion."""
 
     def __init__(self, status_code: int, body: Any, draft: object) -> None:
-        super().__init__(f"API request failed with status {status_code}: {body!r}")
+        details = [f"API request failed with status {status_code}"]
+        if isinstance(body, dict):
+            error_code = body.get("error")
+            if isinstance(error_code, str):
+                details.append(f"error={error_code}")
+            raw_fields = body.get("differing_fields")
+            if isinstance(raw_fields, dict):
+                field_names = sorted(str(field) for field in raw_fields)
+            elif isinstance(raw_fields, list):
+                field_names = sorted(str(field) for field in raw_fields if isinstance(field, str))
+            else:
+                field_names = []
+            if field_names:
+                details.append(f"differing_fields={','.join(field_names)}")
+        super().__init__("; ".join(details))
         self.status_code = status_code
         self.body = body
         self.draft = draft

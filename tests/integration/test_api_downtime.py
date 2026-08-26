@@ -98,6 +98,22 @@ def test_post_different_payload_same_key_returns_409(
         assert count == 1
 
 
+def test_duplicate_409_never_returns_operator_note_values(
+    client: TestClient, migrated_engine: Engine
+) -> None:
+    sentinel = "PRIVATE_NOTE_SENTINEL"
+    line_id, reason_id = _seed_line_and_reason(migrated_engine)
+    original = _payload(line_id, reason_id, operator_note=sentinel)
+    changed = _payload(line_id, reason_id, operator_note="replacement")
+
+    assert client.post("/api/v1/downtime-events", json=original).status_code == 201
+    response = client.post("/api/v1/downtime-events", json=changed)
+
+    assert response.status_code == 409
+    assert response.json()["differing_fields"] == ["operator_note"]
+    assert sentinel not in response.text
+
+
 def test_post_unknown_line_returns_404(client: TestClient, migrated_engine: Engine) -> None:
     _, reason_id = _seed_line_and_reason(migrated_engine)
 

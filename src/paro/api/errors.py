@@ -33,7 +33,7 @@ async def _duplicate_with_different_payload_handler(
             "entity": exc.entity,
             "source": exc.source,
             "external_id": exc.external_id,
-            "differing_fields": json_safe(exc.differing_fields),
+            "differing_fields": sorted(exc.differing_fields),
         },
     )
 

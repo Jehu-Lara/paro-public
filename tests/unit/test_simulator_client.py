@@ -29,15 +29,16 @@ _DRAFT = ProductionRecordDraft(
 
 
 class _FakeResponse:
-    def __init__(self, status_code: int) -> None:
+    def __init__(self, status_code: int, body: Any | None = None) -> None:
         self.status_code = status_code
+        self._body = body
 
     def json(self) -> Any:
-        return {"status": self.status_code}
+        return self._body if self._body is not None else {"status": self.status_code}
 
 
 class _ScriptedClient:
-    def __init__(self, statuses: list[int]) -> None:
+    def __init__(self, statuses: list[int | _FakeResponse]) -> None:
         self._statuses = list(statuses)
         self.calls: list[dict[str, Any]] = []
 
@@ -45,7 +46,8 @@ class _ScriptedClient:
         self, method: str, url: str, *, json: Any = None, headers: Any = None
     ) -> _FakeResponse:
         self.calls.append({"method": method, "url": url, "json": json, "headers": headers})
-        return _FakeResponse(self._statuses.pop(0))
+        response = self._statuses.pop(0)
+        return response if isinstance(response, _FakeResponse) else _FakeResponse(response)
 
 
 def _recording_sleep() -> tuple[list[float], Any]:
@@ -109,6 +111,29 @@ def test_409_is_not_retried() -> None:
 
     assert exc_info.value.status_code == 409
     assert len(client.calls) == 1
+
+
+def test_api_error_string_omits_409_field_values() -> None:
+    sentinel = "PRIVATE_NOTE_SENTINEL"
+    client = _ScriptedClient(
+        [
+            _FakeResponse(
+                409,
+                {
+                    "error": "duplicate_with_different_payload",
+                    "differing_fields": {"operator_note": [sentinel, "replacement"]},
+                },
+            )
+        ]
+    )
+
+    with pytest.raises(ApiError) as exc_info:
+        post_production_record(client, "http://api", _DRAFT)
+
+    error_text = str(exc_info.value)
+    assert "duplicate_with_different_payload" in error_text
+    assert "operator_note" in error_text
+    assert sentinel not in error_text
 
 
 def test_5xx_is_not_retried() -> None:

@@ -89,7 +89,7 @@ def test_post_different_payload_same_key_returns_409(
     assert response.status_code == 409
     body = response.json()
     assert body["error"] == "duplicate_with_different_payload"
-    assert "good_count" in body["differing_fields"]
+    assert body["differing_fields"] == ["good_count"]
 
     with Session(migrated_engine) as session:
         count = session.scalar(select(func.count()).select_from(ProductionRecord))
