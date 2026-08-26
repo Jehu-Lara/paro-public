@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from paro.api.auth import require_api_key
 from paro.api.deps import get_db
-from paro.api.rate_limit import is_trusted_ingest, limiter
+from paro.api.rate_limit import DEFAULT_RATE_LIMIT, is_trusted_ingest, limiter
 from paro.api.schemas.downtime import DowntimeEventCreate, DowntimeEventPatch, DowntimeEventResponse
 from paro.db.models import DowntimeEvent, DowntimeReason, Machine, ProductionLine
 from paro.db.repositories import create_downtime_event, update_downtime_event
@@ -33,7 +33,7 @@ router = APIRouter(prefix="/api/v1", tags=["downtime-events"])
 
 
 @router.post("/downtime-events", response_model=DowntimeEventResponse)
-@limiter.limit("30/minute", exempt_when=is_trusted_ingest)
+@limiter.limit(DEFAULT_RATE_LIMIT, exempt_when=is_trusted_ingest)
 def post_downtime_event(
     request: Request,
     payload: DowntimeEventCreate,
@@ -75,7 +75,7 @@ def post_downtime_event(
 
 
 @router.patch("/downtime-events/{id}", response_model=DowntimeEventResponse)
-@limiter.limit("30/minute", exempt_when=is_trusted_ingest)
+@limiter.limit(DEFAULT_RATE_LIMIT, exempt_when=is_trusted_ingest)
 def patch_downtime_event(
     request: Request,
     id: int,

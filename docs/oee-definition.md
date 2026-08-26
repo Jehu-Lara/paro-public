@@ -119,6 +119,15 @@ OEE          = 1 x 1.25 x 0.9 = 1.125   <- computed with the raw value
 with the raw value, not the capped one: silently capping it would hide a
 misconfigured Ideal Cycle Time behind a plausible-looking number.
 
+## API safety bounds
+
+`GET /api/v1/oee` accepts at most 31 calendar days. The implementation
+allows the one-hour fall-DST expansion so a valid local-calendar window is
+not rejected. Before materializing facts, the query counts matching
+`downtime_event` and `production_record` rows and rejects a combined total
+above 10,000 with `422`; it never truncates an OEE result. The public route
+is rate-limited to 30 requests per minute per client.
+
 ## Non-goals
 
 This document explains what OEE is and how it is computed, for readers who
