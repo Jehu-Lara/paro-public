@@ -54,7 +54,7 @@ python-preference = "system"
 
 [tool.ruff]
 line-length = 100
-src = ["src", "tests", "alembic"]
+src = ["src", "tests", "alembic", "scripts"]
 target-version = "py314"
 
 [tool.ruff.lint]
@@ -70,7 +70,7 @@ select = [
 
 [tool.mypy]
 python_version = "3.14"
-files = ["src", "alembic", "tests"]
+files = ["src", "alembic", "tests", "scripts"]
 strict = true
 warn_unreachable = true
 show_error_codes = true

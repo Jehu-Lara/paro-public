@@ -2,8 +2,8 @@ services:
   - type: web
     name: paro-public
     runtime: python
-    buildCommand: pip install .
-    startCommand: uvicorn paro.main:app --host 0.0.0.0 --port $PORT
+    buildCommand: pip install uv && uv sync --frozen --no-dev
+    startCommand: uv run uvicorn paro.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
       - key: PARO_DATABASE_URL
@@ -18,8 +18,8 @@ services:
     name: paro-live-demo-feed
     runtime: python
     schedule: "*/15 * * * *"
-    buildCommand: pip install '.[simulator]'
-    startCommand: python -m scripts.run_live_demo
+    buildCommand: pip install uv && uv sync --frozen --extra simulator --no-dev
+    startCommand: uv run python -m scripts.run_live_demo
     envVars:
       - key: PARO_DATABASE_URL
         sync: false

@@ -1,7 +1,7 @@
 """Valida que todos los .json bajo PowerBi/ tengan sintaxis valida.
 
 Corre identico en local (`python scripts/validate_powerbi.py`) y en CI
-(`powerbi-json-validate` en `.github/workflows/ci.yml`): sin dependencias de
+(`powerbi-validate` en `.github/workflows/ci.yml`): sin dependencias de
 terceros, solo stdlib, asi ninguno de los dos entornos necesita `uv sync`
 para ejecutarlo.
 """
