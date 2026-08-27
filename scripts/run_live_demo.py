@@ -12,10 +12,9 @@ import httpx2
 from paro.db.session import get_session_local
 from scripts.simulate_production import _ensure_reason_catalog, _resolve_topology
 from scripts.simulator.client import (
-    API_KEY_ENV_VAR,
     REQUEST_TIMEOUT_SECONDS,
-    TRUSTED_INGEST_TOKEN_ENV_VAR,
-    ApiError,
+    ClientError,
+    load_api_credentials,
     patch_downtime_event,
 )
 from scripts.simulator.model import SimulatorConfig
@@ -32,12 +31,11 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
-    api_key = os.environ.get(API_KEY_ENV_VAR)
-    trusted_token = os.environ.get(TRUSTED_INGEST_TOKEN_ENV_VAR)
+    credentials = load_api_credentials()
     if not args.base_url:
         print("[live-demo] PARO_BASE_URL or --base-url is required")
         return 2
-    if not api_key or not trusted_token:
+    if not credentials.api_key or not credentials.trusted_ingest_token:
         print("[live-demo] PARO_API_KEY and PARO_TRUSTED_INGEST_TOKEN are required")
         return 2
 
@@ -54,8 +52,8 @@ def main(argv: list[str] | None = None) -> int:
         plan.run,
         base_url=args.base_url,
         max_workers=args.max_workers,
-        api_key=api_key,
-        trusted_ingest_token=trusted_token,
+        api_key=credentials.api_key,
+        trusted_ingest_token=credentials.trusted_ingest_token,
     )
     patch_failures = []
     with httpx2.Client(timeout=REQUEST_TIMEOUT_SECONDS) as client:
@@ -67,10 +65,10 @@ def main(argv: list[str] | None = None) -> int:
                     closing.event_id,
                     expected_updated_at=closing.expected_updated_at,
                     ended_at=closing.ended_at,
-                    api_key=api_key,
-                    trusted_ingest_token=trusted_token,
+                    api_key=credentials.api_key,
+                    trusted_ingest_token=credentials.trusted_ingest_token,
                 )
-            except ApiError as exc:
+            except ClientError as exc:
                 patch_failures.append(str(exc))
 
     print(

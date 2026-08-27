@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from paro.db.models import DowntimeEvent, ProductionLine, ProductionRecord
@@ -19,11 +19,23 @@ from paro.domain.intervals import Interval
 from paro.domain.oee import DowntimeSpan, OeeResult, calculate_oee
 from paro.domain.warnings import Warning
 
-__all__ = ["LineNotFoundError", "OeeQueryResult", "query_line_oee"]
+__all__ = [
+    "MAX_OEE_QUERY_ROWS",
+    "LineNotFoundError",
+    "OeeQueryLimitExceededError",
+    "OeeQueryResult",
+    "query_line_oee",
+]
+
+MAX_OEE_QUERY_ROWS = 10_000
 
 
 class LineNotFoundError(LookupError):
     """Raised when an OEE query references an unknown production line."""
+
+
+class OeeQueryLimitExceededError(ValueError):
+    """Raised before an OEE query would materialize too many fact rows."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,6 +84,26 @@ def query_line_oee(
     ]
     if source is not None:
         downtime_filters.append(DowntimeEvent.source == source)
+    downtime_count = session.scalar(
+        select(func.count()).select_from(DowntimeEvent).where(*downtime_filters)
+    )
+    production_filters = [
+        ProductionRecord.line_id == line_id,
+        ProductionRecord.interval_start < window.end,
+        ProductionRecord.interval_end > window.start,
+    ]
+    if source is not None:
+        production_filters.append(ProductionRecord.source == source)
+    production_count = session.scalar(
+        select(func.count()).select_from(ProductionRecord).where(*production_filters)
+    )
+    loaded_row_count = (downtime_count or 0) + (production_count or 0)
+    if loaded_row_count > MAX_OEE_QUERY_ROWS:
+        unit = "row" if MAX_OEE_QUERY_ROWS == 1 else "rows"
+        raise OeeQueryLimitExceededError(
+            f"OEE query exceeds the {MAX_OEE_QUERY_ROWS}-{unit} safety limit."
+        )
+
     downtime_events = list(session.scalars(select(DowntimeEvent).where(*downtime_filters)).all())
     planned = [
         DowntimeSpan(start=event.started_at, end=event.ended_at)
@@ -83,14 +115,6 @@ def query_line_oee(
         for event in downtime_events
         if not event.is_planned
     ]
-
-    production_filters = [
-        ProductionRecord.line_id == line_id,
-        ProductionRecord.interval_start < window.end,
-        ProductionRecord.interval_end > window.start,
-    ]
-    if source is not None:
-        production_filters.append(ProductionRecord.source == source)
     overlapping = list(session.scalars(select(ProductionRecord).where(*production_filters)).all())
     included = [
         record

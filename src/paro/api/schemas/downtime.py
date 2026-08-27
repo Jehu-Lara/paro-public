@@ -31,8 +31,8 @@ class DowntimeEventCreate(BaseModel):
     reason_id: int
     is_planned: bool
     operator_note: str | None = None
-    source: str | None = Field(default=None, min_length=1)
-    external_id: str | None = Field(default=None, min_length=1)
+    source: str | None = Field(default=None, min_length=1, max_length=100)
+    external_id: str | None = Field(default=None, min_length=1, max_length=200)
 
     @field_validator("started_at")
     @classmethod
@@ -72,7 +72,7 @@ class DowntimeEventPatch(BaseModel):
     reason_id: int | None = None
     is_planned: bool | None = None
     operator_note: str | None = None
-    actor: str | None = Field(default=None, min_length=1)
+    actor: str | None = Field(default=None, min_length=1, max_length=200)
 
     @field_validator("expected_updated_at")
     @classmethod

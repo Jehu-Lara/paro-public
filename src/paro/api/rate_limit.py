@@ -14,8 +14,9 @@ from slowapi.util import get_remote_address
 
 from paro.config import get_settings
 
-__all__ = ["TRUSTED_INGEST_HEADER", "is_trusted_ingest", "limiter"]
+__all__ = ["DEFAULT_RATE_LIMIT", "TRUSTED_INGEST_HEADER", "is_trusted_ingest", "limiter"]
 
+DEFAULT_RATE_LIMIT = "30/minute"
 TRUSTED_INGEST_HEADER = "X-Paro-Trusted-Ingest"
 
 

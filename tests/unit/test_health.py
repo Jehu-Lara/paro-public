@@ -3,6 +3,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
+import paro.main as main_module
 from paro import __version__
 from paro.config import get_settings
 from paro.main import app
@@ -47,3 +48,31 @@ def test_health_version_matches_openapi() -> None:
 
 def test_unknown_route_returns_404() -> None:
     assert client.get("/no-existe").status_code == 404
+
+
+def test_responses_include_defensive_security_headers() -> None:
+    response = client.get("/health")
+
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["referrer-policy"] == "no-referrer"
+
+
+def test_unhandled_500_in_real_app_keeps_security_headers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sentinel = "PRIVATE_500_SENTINEL"
+
+    def explode(_db: object) -> bool:
+        raise RuntimeError(sentinel)
+
+    monkeypatch.setattr(main_module, "_database_reachable", explode)
+
+    response = client.get("/health")
+
+    assert response.status_code == 500
+    assert response.json() == {"detail": "Internal server error"}
+    assert sentinel not in response.text
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["referrer-policy"] == "no-referrer"

@@ -6,6 +6,8 @@ Sprint 3 adds the domain endpoints (``downtime-events``,
 
 import logging
 import time
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import Depends, FastAPI, Request
@@ -19,8 +21,9 @@ from sqlalchemy.orm import Session
 from starlette.middleware.base import RequestResponseEndpoint
 
 from paro import __version__
+from paro.api.auth import production_api_key_missing
 from paro.api.deps import get_db
-from paro.api.errors import register_exception_handlers
+from paro.api.errors import SECURITY_HEADERS, register_exception_handlers
 from paro.api.rate_limit import limiter
 from paro.api.routers.demo import router as demo_router
 from paro.api.routers.downtime import router as downtime_router
@@ -31,11 +34,28 @@ from paro.logging_config import configure_logging
 configure_logging()
 logger = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    """Reject a production process that cannot authenticate writes."""
+    if production_api_key_missing():
+        raise RuntimeError("PARO_API_KEY is required when PARO_ENV=production")
+    yield
+
+
 app = FastAPI(
     title="PARO",
     version=__version__,
     summary="Downtime capture and deterministic OEE calculation for a production line.",
+    lifespan=_lifespan,
 )
+
+
+@app.middleware("http")
+async def _add_security_headers(request: Request, call_next: RequestResponseEndpoint) -> Response:
+    response = await call_next(request)
+    response.headers.update(SECURITY_HEADERS)
+    return response
 
 
 @app.middleware("http")
@@ -120,6 +140,14 @@ def health(db: Session = Depends(get_db)) -> dict[str, Any]:  # noqa: B008
 @app.get("/ready", tags=["ops"])
 def ready(db: Session = Depends(get_db)) -> Response:  # noqa: B008
     """Dependency readiness, separate from the process liveness contract."""
+    if production_api_key_missing():
+        return Response(
+            content=(
+                '{"status":"not_ready","database":"unknown","configuration":"missing_api_key"}'
+            ),
+            status_code=503,
+            media_type="application/json",
+        )
     if _database_reachable(db):
         return Response(
             content='{"status":"ready","database":"ok"}',

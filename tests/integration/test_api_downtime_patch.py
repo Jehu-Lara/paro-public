@@ -4,13 +4,22 @@ optimista (409) y el ``audit_log`` que resulta de cada cambio real.
 
 from __future__ import annotations
 
+import os
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
+from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
+import paro.api.routers.downtime as downtime_router
 from paro.db.models import AuditLog, DowntimeEvent, DowntimeReason, Machine, ProductionLine
+from paro.db.repositories import update_downtime_event as repository_update_downtime_event
+
+POSTGRES_URL_ENV = "PARO_TEST_POSTGRES_URL"
 
 STARTED_AT = datetime(2026, 8, 10, 22, 0, tzinfo=UTC)
 ENDED_AT = datetime(2026, 8, 10, 22, 5, tzinfo=UTC)
@@ -176,6 +185,24 @@ def test_patch_naive_expected_updated_at_returns_422(
     assert response.status_code == 422
 
 
+def test_patch_rejects_actor_longer_than_database_column(
+    client: TestClient, migrated_engine: Engine
+) -> None:
+    event_id, _, _ = _seed_event(migrated_engine)
+    expected_updated_at = _current_updated_at(migrated_engine, event_id)
+
+    response = client.patch(
+        f"/api/v1/downtime-events/{event_id}",
+        json={
+            "expected_updated_at": expected_updated_at,
+            "operator_note": "corrected",
+            "actor": "a" * 201,
+        },
+    )
+
+    assert response.status_code == 422
+
+
 def test_patch_machine_id_reference(client: TestClient, migrated_engine: Engine) -> None:
     event_id, line_id, _ = _seed_event(migrated_engine)
     expected_updated_at = _current_updated_at(migrated_engine, event_id)
@@ -192,3 +219,53 @@ def test_patch_machine_id_reference(client: TestClient, migrated_engine: Engine)
 
     assert response.status_code == 200
     assert response.json()["machine_id"] == machine_id
+
+
+@pytest.mark.skipif(
+    not os.environ.get(POSTGRES_URL_ENV),
+    reason="requires the PostgreSQL integration fixture",
+)
+def test_concurrent_patch_allows_exactly_one_writer(
+    client: TestClient,
+    migrated_engine: Engine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    event_id, _, _ = _seed_event(migrated_engine)
+    expected_updated_at = _current_updated_at(migrated_engine, event_id)
+    barrier = threading.Barrier(2)
+
+    def synchronized_update(
+        session: Session,
+        *,
+        event: DowntimeEvent,
+        expected_updated_at: datetime,
+        changes: dict[str, Any],
+        actor: str | None,
+    ) -> tuple[DowntimeEvent, bool]:
+        barrier.wait(timeout=10)
+        return repository_update_downtime_event(
+            session,
+            event=event,
+            expected_updated_at=expected_updated_at,
+            changes=changes,
+            actor=actor,
+        )
+
+    monkeypatch.setattr(downtime_router, "update_downtime_event", synchronized_update)
+
+    def patch(note: str) -> int:
+        response = client.patch(
+            f"/api/v1/downtime-events/{event_id}",
+            json={"expected_updated_at": expected_updated_at, "operator_note": note},
+        )
+        return response.status_code
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        statuses = sorted(pool.map(patch, ("writer-a", "writer-b")))
+
+    assert statuses == [200, 409]
+    with Session(migrated_engine) as session:
+        assert session.scalar(select(func.count()).select_from(AuditLog)) == 1
+        event = session.get(DowntimeEvent, event_id)
+        assert event is not None
+        assert event.operator_note in {"writer-a", "writer-b"}

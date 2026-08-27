@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
+import pytest
 import scripts.seed_demo as seed_demo
 from fastapi.testclient import TestClient
 from scripts.qa_simulator import _reason_planned_by_id, _run_and_check
@@ -30,6 +31,7 @@ from scripts.simulator.qa import check_structural
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
+from paro.config import get_settings
 from paro.db.models import DowntimeReason
 
 _START = datetime(2026, 8, 10, 6, 0, tzinfo=UTC)
@@ -52,28 +54,36 @@ def _one_machine_config(config: SimulatorConfig) -> SimulatorConfig:
 
 
 def test_smoke_shaped_run_and_idempotency_pass_with_zero_findings(
-    client: TestClient, migrated_engine: Engine
+    client: TestClient,
+    migrated_engine: Engine,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    with Session(migrated_engine) as session:
-        full_config = _seed_topology_and_catalog(session)
-        reason_planned_by_id = _reason_planned_by_id(session)
+    monkeypatch.setenv("PARO_API_KEY", "qa-secret")
+    get_settings.cache_clear()
+    try:
+        with Session(migrated_engine) as session:
+            full_config = _seed_topology_and_catalog(session)
+            reason_planned_by_id = _reason_planned_by_id(session)
 
-    small_config = _one_machine_config(full_config)
+        small_config = _one_machine_config(full_config)
 
-    findings, _ = _run_and_check(
-        client,
-        small_config,
-        MASTER_SEED,
-        _START,
-        _END,
-        "",
-        reason_planned_by_id,
-        1,  # max_workers=1: SQLite doesn't handle concurrent writes (ADR 0002/0003), same
-        # constraint test_simulator_client_roundtrip.py's own docstring already flags
-        None,
-    )
+        findings, _ = _run_and_check(
+            client,
+            small_config,
+            MASTER_SEED,
+            _START,
+            _END,
+            "",
+            reason_planned_by_id,
+            1,  # max_workers=1: SQLite doesn't handle concurrent writes (ADR 0002/0003), same
+            # constraint test_simulator_client_roundtrip.py's own docstring already flags
+            "qa-secret",
+            None,
+        )
 
-    assert findings == []
+        assert findings == []
+    finally:
+        get_settings.cache_clear()
 
 
 def test_corrupted_catalog_produces_is_planned_mismatch_finding(

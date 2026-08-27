@@ -9,7 +9,7 @@
 # El job `changes` decide, segun los paths modificados, cuales de los demas
 # jobs corren: `quality`/`integration-postgres` solo si cambio codigo/deps
 # relevantes, `alembic-dry-run` solo si cambio `alembic/`, y
-# `powerbi-json-validate` solo si cambio un .json bajo `PowerBi/`.
+# `powerbi-validate` si cambia cualquier fuente bajo `PowerBi/`, incluido TMDL.
 name: CI
 
 on:
@@ -35,13 +35,14 @@ jobs:
               - 'src/**'
               - 'tests/**'
               - 'alembic/**'
+              - 'scripts/**'
               - 'pyproject.toml'
               - 'uv.lock'
               - '.github/workflows/ci.yml'
             alembic:
               - 'alembic/**'
             powerbi:
-              - 'PowerBi/**/*.json'
+              - 'PowerBi/**'
 
   quality:
     needs: changes
@@ -62,13 +63,13 @@ jobs:
         run: uv sync --extra dev --frozen
 
       - name: Ruff (lint)
-        run: uv run ruff check src tests alembic
+        run: uv run ruff check src tests alembic scripts
 
       - name: Ruff (format)
-        run: uv run ruff format --check src tests alembic
+        run: uv run ruff format --check src tests alembic scripts
 
       - name: Mypy
-        run: uv run mypy src alembic tests
+        run: uv run mypy src alembic tests scripts
 
       - name: Pytest
         run: uv run pytest -v
@@ -152,7 +153,7 @@ jobs:
       - name: Alembic dry-run (SQL offline, sin conexion a base de datos)
         run: uv run alembic upgrade head --sql
 
-  powerbi-json-validate:
+  powerbi-validate:
     needs: changes
     if: needs.changes.outputs.powerbi == 'true'
     runs-on: ubuntu-latest

@@ -38,8 +38,8 @@ class ProductionRecordCreate(BaseModel):
     total_count: int = Field(ge=0)
     good_count: int = Field(ge=0)
     ideal_cycle_time_seconds: Decimal = Field(ge=0, max_digits=10, decimal_places=3)
-    source: str | None = Field(default=None, min_length=1)
-    external_id: str | None = Field(default=None, min_length=1)
+    source: str | None = Field(default=None, min_length=1, max_length=100)
+    external_id: str | None = Field(default=None, min_length=1, max_length=200)
 
     @field_validator("interval_start")
     @classmethod

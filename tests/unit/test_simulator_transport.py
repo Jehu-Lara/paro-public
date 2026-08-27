@@ -9,6 +9,9 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
+import httpx2
+import pytest
+import scripts.simulator.client as simulator_client
 from scripts.simulator.model import (
     DowntimeEventDraft,
     GeneratedRun,
@@ -134,3 +137,30 @@ def test_empty_run_produces_zero_counts() -> None:
     assert result.succeeded is True
     assert result.production_records_created == 0
     assert result.downtime_events_created == 0
+
+
+def test_timeout_is_collected_without_aborting_other_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    successful = _production_record("pr-success")
+    timed_out = _production_record("pr-timeout")
+
+    class TimeoutClient(_KeyedClient):
+        def request(
+            self, method: str, url: str, *, json: Any = None, headers: Any = None
+        ) -> _FakeResponse:
+            if json["external_id"] == "pr-timeout":
+                raise httpx2.TimeoutException("simulated timeout")
+            return super().request(method, url, json=json, headers=headers)
+
+    monkeypatch.setattr(simulator_client, "RETRY_MAX_ATTEMPTS", 1)
+    result = transport(
+        GeneratedRun(production_records=(successful, timed_out), downtime_events=()),
+        base_url="http://api",
+        client=TimeoutClient({"pr-success": 201}),
+    )
+
+    assert result.production_records_created == 1
+    assert len(result.failures) == 1
+    assert result.failures[0].draft == timed_out
+    assert "TimeoutException" in result.failures[0].error

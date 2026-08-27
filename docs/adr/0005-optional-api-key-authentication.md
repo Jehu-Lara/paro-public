@@ -28,11 +28,12 @@ Add `PARO_API_KEY` (`src/paro/config.py`, unset by default, same as
 `trusted_ingest_token`) and a `require_api_key` FastAPI dependency
 (`src/paro/api/auth.py`) wired into the three write endpoints only —
 `POST /downtime-events`, `PATCH /downtime-events/{id}`,
-`POST /production-records`. When unset, `require_api_key` is a no-op:
-every write endpoint behaves exactly as it does today, including on the
-live Render demo, unless the operator deliberately sets the variable
-there too. When set, a request missing the `X-API-Key` header or sending
-one that doesn't match (constant-time compared) gets `401`.
+`POST /production-records`. In local and other non-production environments,
+an unset key remains a no-op. In `PARO_ENV=production`, a missing or blank
+key fails application startup, makes `/ready` return `503` if invoked
+without lifespan, and makes the write dependency fail closed. When set, a
+request missing the `X-API-Key` header or sending one that doesn't match
+(constant-time compared) gets `401`.
 
 `GET /health` and `GET /oee` are never gated — they're read-only, and
 gating them would break the "browse the live docs/data" part of the
@@ -46,14 +47,13 @@ question.
 
 ## Consequences
 
-- The live demo's behavior doesn't change unless the operator sets
-  `PARO_API_KEY` on Render too — this ADR ships the capability, not a
-  deployment change.
+- A production process cannot become ready or accept writes unless the
+  operator sets `PARO_API_KEY`. Local development remains key-optional.
 - `README.md`'s "Out of MVP scope" table and "Limitations" section are
   updated to describe the actual, current mechanism instead of a blanket
   "out of scope" — see the README diff in the same change.
-- A real deployment is one environment variable away from requiring a
-  key on every write, with zero code changes.
+- Production requires one environment variable before startup; no code
+  change or alternate authentication mode is needed.
 - Still out of scope, deliberately: multiple keys/rotation, per-client
   keys, JWT/OAuth, RBAC. If a future need for those arises, that's its
   own ADR, not an extension bolted onto this one.

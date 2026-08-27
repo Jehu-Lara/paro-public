@@ -15,11 +15,12 @@ No OEE logic here: these repositories only persist rows.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 
-from sqlalchemy import select
+from sqlalchemy import select, update
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -224,9 +225,9 @@ def update_downtime_event(
 ) -> tuple[DowntimeEvent, bool]:
     """Applies a partial correction to ``event``; returns ``(event, was_changed)``.
 
-    ``expected_updated_at`` must match ``event.updated_at`` or this raises
-    :class:`StaleUpdateError` -- optimistic concurrency, no row lock held
-    between the caller reading the row and submitting this call.
+    ``expected_updated_at`` must match ``event.updated_at`` and the database
+    row at update time. The conditional ``UPDATE`` closes the read/write
+    race without holding a lock while the HTTP payload is processed.
 
     ``changes`` holds only the fields the caller actually sent (see
     ``DowntimeEventPatch.model_fields_set`` at the call site); a value equal
@@ -248,12 +249,37 @@ def update_downtime_event(
         old_value = getattr(event, field)
         if old_value != new_value:
             diff[field] = [old_value, new_value]
-            setattr(event, field, new_value)
 
     if not diff:
         return event, False
 
-    session.flush()
+    new_values = {field: values[1] for field, values in diff.items()}
+    new_values["updated_at"] = datetime.now(UTC)
+    result = cast(
+        CursorResult[Any],
+        session.execute(
+            update(DowntimeEvent)
+            .where(
+                DowntimeEvent.id == event.id,
+                DowntimeEvent.updated_at == expected_updated_at,
+            )
+            .values(**new_values)
+            .execution_options(synchronize_session=False)
+        ),
+    )
+    if result.rowcount != 1:
+        actual_updated_at = session.scalar(
+            select(DowntimeEvent.updated_at).where(DowntimeEvent.id == event.id)
+        )
+        assert actual_updated_at is not None
+        raise StaleUpdateError(
+            entity="downtime_event",
+            id=event.id,
+            expected_updated_at=expected_updated_at,
+            actual_updated_at=actual_updated_at,
+        )
+
+    session.refresh(event)
     session.add(
         AuditLog(
             downtime_event_id=event.id,

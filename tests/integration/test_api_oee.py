@@ -14,7 +14,10 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
+from starlette.requests import Request
 
+import paro.application.oee_query as oee_query
+from paro.api.rate_limit import limiter
 from paro.api.routers.oee import _ideal_time_total_seconds, get_oee
 from paro.db.models import DowntimeEvent, DowntimeReason, ProductionLine, ProductionRecord
 from paro.domain.intervals import Interval
@@ -361,6 +364,91 @@ def test_get_oee_line_without_data_returns_200_with_warnings(
     assert "ZERO_TOTAL_COUNT" in body["warnings"]
 
 
+def test_get_oee_accepts_a_31_day_window(client: TestClient, migrated_engine: Engine) -> None:
+    with Session(migrated_engine) as session:
+        line = _seed_line(session)
+        session.commit()
+        line_id = line.id
+
+    response = client.get(
+        "/api/v1/oee",
+        params={
+            "line_id": line_id,
+            "start": WINDOW_START.isoformat(),
+            "end": (WINDOW_START + timedelta(days=31)).isoformat(),
+        },
+    )
+
+    assert response.status_code == 200
+
+
+def test_get_oee_rejects_a_32_day_window(client: TestClient, migrated_engine: Engine) -> None:
+    with Session(migrated_engine) as session:
+        line = _seed_line(session)
+        session.commit()
+        line_id = line.id
+
+    response = client.get(
+        "/api/v1/oee",
+        params={
+            "line_id": line_id,
+            "start": WINDOW_START.isoformat(),
+            "end": (WINDOW_START + timedelta(days=32)).isoformat(),
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "OEE window must not exceed 31 calendar days."
+
+
+def test_get_oee_rejects_a_query_over_the_row_cap(
+    client: TestClient,
+    migrated_engine: Engine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with Session(migrated_engine) as session:
+        line = _seed_full_scenario(session)
+        line_id = line.id
+    monkeypatch.setattr(oee_query, "MAX_OEE_QUERY_ROWS", 1)
+
+    response = client.get(
+        "/api/v1/oee",
+        params={
+            "line_id": line_id,
+            "start": WINDOW_START.isoformat(),
+            "end": WINDOW_END.isoformat(),
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "OEE query exceeds the 1-row safety limit."
+
+
+def test_get_oee_is_rate_limited(client: TestClient, migrated_engine: Engine) -> None:
+    with Session(migrated_engine) as session:
+        line = _seed_line(session)
+        session.commit()
+        line_id = line.id
+    limiter.reset()
+    try:
+        statuses = [
+            client.get(
+                "/api/v1/oee",
+                params={
+                    "line_id": line_id,
+                    "start": WINDOW_START.isoformat(),
+                    "end": WINDOW_END.isoformat(),
+                },
+            ).status_code
+            for _ in range(31)
+        ]
+    finally:
+        limiter.reset()
+
+    assert statuses[:30] == [200] * 30
+    assert statuses[30] == 429
+
+
 def test_get_oee_rejects_naive_datetime(client: TestClient, migrated_engine: Engine) -> None:
     with Session(migrated_engine) as session:
         line = _seed_line(session)
@@ -421,6 +509,20 @@ def test_get_oee_rejects_tzinfo_with_none_utcoffset_as_422_not_500(
     broken_start = datetime(2026, 8, 10, 22, 0, tzinfo=_BrokenTzinfo())
 
     with Session(migrated_engine) as session, pytest.raises(HTTPException) as exc_info:
-        get_oee(line_id=line_id, start=broken_start, end=WINDOW_END, db=session)
+        get_oee(
+            request=Request(
+                {
+                    "type": "http",
+                    "headers": [],
+                    "method": "GET",
+                    "path": "/api/v1/oee",
+                    "client": ("testclient", 50_000),
+                }
+            ),
+            line_id=line_id,
+            start=broken_start,
+            end=WINDOW_END,
+            db=session,
+        )
 
     assert exc_info.value.status_code == 422

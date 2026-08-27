@@ -17,9 +17,15 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from paro.db.exceptions import DuplicateWithDifferentPayloadError, StaleUpdateError
 from paro.json_safe import json_safe
 
-__all__ = ["register_exception_handlers"]
+__all__ = ["SECURITY_HEADERS", "register_exception_handlers"]
 
 logger = logging.getLogger(__name__)
+
+SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+}
 
 
 async def _duplicate_with_different_payload_handler(
@@ -33,7 +39,7 @@ async def _duplicate_with_different_payload_handler(
             "entity": exc.entity,
             "source": exc.source,
             "external_id": exc.external_id,
-            "differing_fields": json_safe(exc.differing_fields),
+            "differing_fields": sorted(exc.differing_fields),
         },
     )
 
@@ -83,7 +89,9 @@ class _UnhandledExceptionBoundary:
             )
             if not response_started:
                 response = JSONResponse(
-                    status_code=500, content={"detail": "Internal server error"}
+                    status_code=500,
+                    content={"detail": "Internal server error"},
+                    headers=SECURITY_HEADERS,
                 )
                 await response(scope, receive, send)
 

@@ -6,12 +6,16 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
+import httpx2
 import pytest
+import scripts.simulator.client as simulator_client
 from scripts.simulator.client import (
     API_KEY_ENV_VAR,
     RETRY_MAX_ATTEMPTS,
     TRUSTED_INGEST_HEADER,
     ApiError,
+    ResponseDecodeError,
+    load_api_credentials,
     post_production_record,
 )
 from scripts.simulator.model import ProductionRecordDraft
@@ -29,15 +33,16 @@ _DRAFT = ProductionRecordDraft(
 
 
 class _FakeResponse:
-    def __init__(self, status_code: int) -> None:
+    def __init__(self, status_code: int, body: Any | None = None) -> None:
         self.status_code = status_code
+        self._body = body
 
     def json(self) -> Any:
-        return {"status": self.status_code}
+        return self._body if self._body is not None else {"status": self.status_code}
 
 
 class _ScriptedClient:
-    def __init__(self, statuses: list[int]) -> None:
+    def __init__(self, statuses: list[int | _FakeResponse | Exception]) -> None:
         self._statuses = list(statuses)
         self.calls: list[dict[str, Any]] = []
 
@@ -45,7 +50,10 @@ class _ScriptedClient:
         self, method: str, url: str, *, json: Any = None, headers: Any = None
     ) -> _FakeResponse:
         self.calls.append({"method": method, "url": url, "json": json, "headers": headers})
-        return _FakeResponse(self._statuses.pop(0))
+        response = self._statuses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response if isinstance(response, _FakeResponse) else _FakeResponse(response)
 
 
 def _recording_sleep() -> tuple[list[float], Any]:
@@ -88,6 +96,17 @@ def test_retries_429_with_exponential_backoff_then_succeeds() -> None:
     assert delays == [1.0, 2.0]
 
 
+def test_retries_transport_error_then_succeeds() -> None:
+    client = _ScriptedClient([httpx2.TimeoutException("simulated timeout"), 201])
+    delays, sleep = _recording_sleep()
+
+    _, was_created = post_production_record(client, "http://api", _DRAFT, sleep=sleep)
+
+    assert was_created is True
+    assert len(client.calls) == 2
+    assert delays == [1.0]
+
+
 def test_exhausting_retry_budget_on_429_raises_api_error() -> None:
     client = _ScriptedClient([429] * RETRY_MAX_ATTEMPTS)
     delays, sleep = _recording_sleep()
@@ -111,8 +130,46 @@ def test_409_is_not_retried() -> None:
     assert len(client.calls) == 1
 
 
+def test_api_error_string_omits_409_field_values() -> None:
+    sentinel = "PRIVATE_NOTE_SENTINEL"
+    client = _ScriptedClient(
+        [
+            _FakeResponse(
+                409,
+                {
+                    "error": "duplicate_with_different_payload",
+                    "differing_fields": {"operator_note": [sentinel, "replacement"]},
+                },
+            )
+        ]
+    )
+
+    with pytest.raises(ApiError) as exc_info:
+        post_production_record(client, "http://api", _DRAFT)
+
+    error_text = str(exc_info.value)
+    assert "duplicate_with_different_payload" in error_text
+    assert "operator_note" in error_text
+    assert sentinel not in error_text
+
+
+def test_invalid_success_json_raises_safe_decode_error() -> None:
+    sentinel = "PRIVATE_RESPONSE_SENTINEL"
+
+    class InvalidJsonResponse(_FakeResponse):
+        def json(self) -> Any:
+            raise ValueError(sentinel)
+
+    client = _ScriptedClient([InvalidJsonResponse(201)])
+
+    with pytest.raises(ResponseDecodeError) as exc_info:
+        post_production_record(client, "http://api", _DRAFT)
+
+    assert sentinel not in str(exc_info.value)
+
+
 def test_5xx_is_not_retried() -> None:
-    """Deliberate (see client.py's _post_with_retry comment): section 9 only
+    """Deliberate (see client.py's _request_with_retry comment): section 9 only
     specifies retry semantics for 429, and a 5xx here is an unhandled-
     exception bug, not transient noise."""
     client = _ScriptedClient([500])
@@ -156,3 +213,15 @@ def test_api_key_and_trusted_ingest_headers_are_sent_independently() -> None:
         "X-API-Key": "api-secret",
         TRUSTED_INGEST_HEADER: "ingest-secret",
     }
+
+
+def test_load_api_credentials_reads_both_environment_variables(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(API_KEY_ENV_VAR, "api-secret")
+    monkeypatch.setenv(simulator_client.TRUSTED_INGEST_TOKEN_ENV_VAR, "ingest-secret")
+
+    credentials = load_api_credentials()
+
+    assert credentials.api_key == "api-secret"
+    assert credentials.trusted_ingest_token == "ingest-secret"

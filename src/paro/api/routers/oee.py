@@ -17,15 +17,17 @@ domain's ``window``.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from paro.api.deps import get_db
+from paro.api.rate_limit import DEFAULT_RATE_LIMIT, limiter
 from paro.api.schemas.oee import OEEResponse
 from paro.application.oee_query import (
     LineNotFoundError,
+    OeeQueryLimitExceededError,
     _ideal_time_total_seconds,
     query_line_oee,
 )
@@ -34,6 +36,11 @@ from paro.domain.intervals import require_aware
 __all__ = ["_ideal_time_total_seconds", "router"]
 
 router = APIRouter(prefix="/api/v1", tags=["oee"])
+
+# One extra hour keeps a 31-calendar-day request valid across a fall DST
+# transition while still rejecting a 32-day scan.
+MAX_OEE_WINDOW = timedelta(days=31, hours=1)
+MAX_OEE_WINDOW_MESSAGE = "OEE window must not exceed 31 calendar days."
 
 
 def _require_aware(value: datetime, field: str) -> None:
@@ -49,7 +56,9 @@ def _require_aware(value: datetime, field: str) -> None:
 
 
 @router.get("/oee", response_model=OEEResponse)
+@limiter.limit(DEFAULT_RATE_LIMIT)
 def get_oee(
+    request: Request,
     line_id: int = Query(...),
     start: datetime = Query(...),  # noqa: B008
     end: datetime = Query(...),  # noqa: B008
@@ -65,11 +74,15 @@ def get_oee(
     _require_aware(end, "end")
     if end <= start:
         raise HTTPException(status_code=422, detail="end must be greater than start.")
+    if end - start > MAX_OEE_WINDOW:
+        raise HTTPException(status_code=422, detail=MAX_OEE_WINDOW_MESSAGE)
 
     try:
         snapshot = query_line_oee(db, line_id=line_id, start=start, end=end)
     except LineNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except OeeQueryLimitExceededError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     return OEEResponse(
         line_id=line_id,

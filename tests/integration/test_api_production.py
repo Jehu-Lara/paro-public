@@ -89,7 +89,7 @@ def test_post_different_payload_same_key_returns_409(
     assert response.status_code == 409
     body = response.json()
     assert body["error"] == "duplicate_with_different_payload"
-    assert "good_count" in body["differing_fields"]
+    assert body["differing_fields"] == ["good_count"]
 
     with Session(migrated_engine) as session:
         count = session.scalar(select(func.count()).select_from(ProductionRecord))
@@ -139,5 +139,28 @@ def test_post_invalid_payload_returns_422(
     line_id = _seed_line(migrated_engine)
 
     response = client.post("/api/v1/production-records", json=_payload(line_id, **overrides))
+
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("source", "s" * 101),
+        ("external_id", "e" * 201),
+    ],
+)
+def test_post_rejects_strings_longer_than_database_columns(
+    client: TestClient,
+    migrated_engine: Engine,
+    field: str,
+    value: str,
+) -> None:
+    line_id = _seed_line(migrated_engine)
+
+    response = client.post(
+        "/api/v1/production-records",
+        json=_payload(line_id, **{field: value}),
+    )
 
     assert response.status_code == 422

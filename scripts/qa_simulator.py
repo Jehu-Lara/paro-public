@@ -13,7 +13,6 @@ applies here unchanged -- see that module's docstring.
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -33,8 +32,8 @@ from scripts.simulate_production import (
 )
 from scripts.simulator.client import (
     REQUEST_TIMEOUT_SECONDS,
-    TRUSTED_INGEST_TOKEN_ENV_VAR,
     HttpClient,
+    load_api_credentials,
 )
 from scripts.simulator.config import (
     ACCEPTANCE_DURATION_DAYS,
@@ -97,6 +96,7 @@ def _run_and_check(
     base_url: str,
     reason_planned_by_id: dict[int, bool],
     max_workers: int,
+    api_key: str | None,
     trusted_ingest_token: str | None,
 ) -> tuple[list[Finding], GeneratedRun]:
     findings: list[Finding] = []
@@ -108,6 +108,7 @@ def _run_and_check(
         run,
         base_url=base_url,
         max_workers=max_workers,
+        api_key=api_key,
         trusted_ingest_token=trusted_ingest_token,
         client=client,
     )
@@ -124,6 +125,7 @@ def _run_and_check(
         run,
         base_url=base_url,
         max_workers=max_workers,
+        api_key=api_key,
         trusted_ingest_token=trusted_ingest_token,
         client=client,
     )
@@ -142,7 +144,7 @@ def main(argv: list[str] | None = None) -> int:
         reason_planned_by_id = _reason_planned_by_id(session)
 
     full_config = SimulatorConfig(lines=lines, machines=machines, reason_ids=reason_ids)
-    trusted_ingest_token = os.environ.get(TRUSTED_INGEST_TOKEN_ENV_VAR)
+    credentials = load_api_credentials()
     findings: list[Finding] = []
 
     with httpx2.Client(timeout=REQUEST_TIMEOUT_SECONDS) as client:
@@ -158,7 +160,8 @@ def main(argv: list[str] | None = None) -> int:
             args.base_url,
             reason_planned_by_id,
             DEFAULT_MAX_WORKERS,
-            trusted_ingest_token,
+            credentials.api_key,
+            credentials.trusted_ingest_token,
         )
         findings.extend(smoke_findings)
 
@@ -174,7 +177,8 @@ def main(argv: list[str] | None = None) -> int:
                 args.base_url,
                 reason_planned_by_id,
                 DEFAULT_MAX_WORKERS,
-                trusted_ingest_token,
+                credentials.api_key,
+                credentials.trusted_ingest_token,
             )
             findings.extend(acceptance_findings)
             oee_by_line = {
