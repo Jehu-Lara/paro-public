@@ -25,7 +25,7 @@ jobs:
       alembic: ${{ steps.filter.outputs.alembic }}
       powerbi: ${{ steps.filter.outputs.powerbi }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - uses: dorny/paths-filter@v3
         id: filter
@@ -49,7 +49,7 @@ jobs:
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
@@ -108,7 +108,7 @@ jobs:
       PARO_TEST_POSTGRES_URL: postgresql+psycopg://paro:paro@localhost:5432/paro_test
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
@@ -137,7 +137,7 @@ jobs:
       # caeria al default de SQLite y el SQL generado no seria el correcto.
       PARO_DATABASE_URL: postgresql+psycopg://paro:paro@localhost:5432/paro_dry_run
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
@@ -158,7 +158,7 @@ jobs:
     if: needs.changes.outputs.powerbi == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v5
         with:
